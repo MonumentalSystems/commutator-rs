@@ -1,0 +1,21 @@
+[package]
+name = "experiment-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Transport-neutral contracts for reproducible computational experiments"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/experiment-core"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["experiment", "simulation", "distributed-computing", "reproducibility"]
+categories = ["science"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1.0"
+

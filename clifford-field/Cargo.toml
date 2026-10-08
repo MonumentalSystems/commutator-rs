@@ -1,0 +1,22 @@
+[package]
+name = "clifford-field"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Reusable Clifford field storage, CPU simulation kernels, and numerical analysis for Rust"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/clifford-field"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["clifford-algebra", "simulation", "physics", "precision"]
+categories = ["mathematics", "science"]
+
+[dependencies]
+clifford-core = { version = "0.1.0", path = "../clifford-core" }
+rayon = "1.10"
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1.0"

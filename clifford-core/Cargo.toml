@@ -1,0 +1,18 @@
+[package]
+name = "clifford-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Precision-generic Clifford algebra primitives for Rust"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/clifford-core"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["clifford-algebra", "geometric-algebra", "multivector", "rotor"]
+categories = ["mathematics", "science"]
+
+[dev-dependencies]
+serde_json = "1.0"
+
