@@ -16,4 +16,6 @@ is versioned independently; release headings include the crate name.
 - Extract safe quaternion, spherical Lohe, gated-scan, and Helmholtz reference
   dynamics into the dependency-free `harmonic-dynamics` crate.
 - Publish transport-neutral experiment and reproducibility contracts.
+- Add context-bound Merkle commitments and deterministic post-commitment spot
+  checks in `experiment-merkle`.
 

@@ -14,6 +14,11 @@ A distributed adapter can map the neutral contracts onto:
 - checkpoints and generation-aware retries;
 - signed source and release manifests.
 
+`experiment-merkle` implements the transport-neutral commitment and opening
+portion of that adapter boundary. Its v1 roots are context-bound and
+intentionally differ from legacy Commutator roots; deploying them requires an
+explicit protocol-version negotiation.
+
 The adapter owns transport, authentication, persistence, scheduling, and
 reputation. The experiment owns configuration, deterministic seeds, numerical
 work, validation policy, and reproducibility metadata. This separation makes

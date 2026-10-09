@@ -6,6 +6,7 @@ members = [
     "clifford-lattice",
     "clifford-layers",
     "experiment-core",
+    "experiment-merkle",
     "harmonic-dynamics",
 ]
 default-members = [
@@ -15,6 +16,7 @@ default-members = [
     "clifford-lattice",
     "clifford-layers",
     "experiment-core",
+    "experiment-merkle",
     "harmonic-dynamics",
 ]
 resolver = "2"
