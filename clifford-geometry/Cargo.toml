@@ -1,0 +1,18 @@
+[package]
+name = "clifford-geometry"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Sparse geometric-algebra types and EGA, PGA, CGA, STA geometry for Rust"
+license = "BSD-2-Clause"
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/clifford-geometry"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["clifford-algebra", "geometric-algebra", "cga", "pga", "rotor"]
+categories = ["mathematics", "science"]
+include = ["src/**/*.rs", "tests/**/*.rs", "Cargo.toml", "README.md", "LICENSE"]
+
+[dependencies]
+clifford-core = { version = "0.1.0", path = "../clifford-core" }
