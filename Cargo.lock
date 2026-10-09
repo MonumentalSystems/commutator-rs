@@ -80,6 +80,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "harmonic-dynamics"
+version = "0.1.0"
+dependencies = [
+ "clifford-core",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -5,6 +5,7 @@ members = [
     "clifford-geometry",
     "clifford-layers",
     "experiment-core",
+    "harmonic-dynamics",
 ]
 default-members = [
     "clifford-core",
@@ -12,6 +13,7 @@ default-members = [
     "clifford-geometry",
     "clifford-layers",
     "experiment-core",
+    "harmonic-dynamics",
 ]
 resolver = "2"
 
