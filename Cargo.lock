@@ -33,6 +33,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "clifford-lattice"
+version = "0.1.0"
+dependencies = [
+ "clifford-core",
+]
+
+[[package]]
 name = "clifford-layers"
 version = "0.1.0"
 dependencies = [
