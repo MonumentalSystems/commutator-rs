@@ -17,6 +17,7 @@ or volunteer-computing backends.
 | [`clifford-geometry`](clifford-geometry) | Fixed-size EGA, PGA, CGA, STA, and Cl(6,0) geometry with motors, conformal primitives, frames, and kinematic chains | `clifford-core` |
 | [`clifford-layers`](clifford-layers) | Framework-neutral Clifford linear, convolution, normalization, and optional Fourier layers | `clifford-core`, optional RustFFT |
 | [`experiment-core`](experiment-core) | Transport-neutral work, result, topology, verification, checkpoint-reference, and reproducibility contracts | Serde |
+| [`harmonic-dynamics`](harmonic-dynamics) | Safe quaternion and sphere geometry, Lohe synchronization, gated scans, and Helmholtz sequence fibers | none |
 
 The foundational crates deliberately do not contain HTTP, databases, identity,
 scheduling, or a particular scientific model. Those capabilities belong in
@@ -68,10 +69,12 @@ clifford-core
 ├── clifford-geometry
 └── clifford-layers
 
-experiment-core    (independent contracts)
-       ^
-       |
-host runtimes, optimized backends, and distributed schedulers
+experiment-core                 harmonic-dynamics
+(independent contracts)         (independent numerical dynamics)
+          ^                                  ^
+          +----------------+-----------------+
+                           |
+        host runtimes, optimized backends, and distributed schedulers
 ```
 
 See [Architecture](docs/architecture.md) for the crate boundaries and

@@ -39,6 +39,14 @@ verification policy, checkpoint references, worker capabilities, and run
 metadata. It does not choose an async runtime, wire format, database, or
 identity system.
 
+## Harmonic dynamics
+
+`harmonic-dynamics` owns dependency-free quaternion and sphere geometry,
+Lohe mean-field synchronization, stable gated recurrences, and multi-head
+Helmholtz sequence fibers. It is a portable numerical reference crate: neural
+network frameworks, model configuration, serialization, accelerator kernels,
+and distributed execution remain outside its boundary.
+
 ## Host adapters
 
 A host may connect those layers to SIMD, Metal, CUDA, Accelerate, WebGPU,

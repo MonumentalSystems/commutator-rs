@@ -11,5 +11,7 @@ is versioned independently; release headings include the crate name.
 - Extract fixed-size Versor geometry into `clifford-geometry` while excluding
   its duplicate simulation and hardware-backend code.
 - Extract framework-neutral Clifford neural layers into `clifford-layers`.
+- Extract safe quaternion, spherical Lohe, gated-scan, and Helmholtz reference
+  dynamics into the dependency-free `harmonic-dynamics` crate.
 - Publish transport-neutral experiment and reproducibility contracts.
 
