@@ -39,6 +39,16 @@ verification policy, checkpoint references, worker capabilities, and run
 metadata. It does not choose an async runtime, wire format, database, or
 identity system.
 
+## Lattice layer
+
+`clifford-lattice` owns checked pure-f64 Cl⁺(6,0) elements and Spin(6)
+rotors, generic periodic two-dimensional storage, explicit pair-interaction
+and proposal policies, and a deterministic sequential Metropolis reference
+sweep. Its only runtime dependency is `clifford-core`. Parallel checkerboard
+sweeps, deterministic rotor flow, Langevin dynamics, accelerator kernels, and
+experiment-specific parameter choices remain outside the crate until they
+have one validated numerical contract.
+
 ## Harmonic dynamics
 
 `harmonic-dynamics` owns dependency-free quaternion and sphere geometry,

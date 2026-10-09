@@ -15,6 +15,7 @@ or volunteer-computing backends.
 | [`clifford-core`](clifford-core) | Runtime-signature `Cl(p,q)`, geometric products, grades, rotors, and frozen cross-implementation conventions | none |
 | [`clifford-field`](clifford-field) | Cl(1,3) field storage, boundary operators, reference steppers, and portable numerical analysis | `clifford-core`, Rayon, Serde |
 | [`clifford-geometry`](clifford-geometry) | Fixed-size EGA, PGA, CGA, STA, and Cl(6,0) geometry with motors, conformal primitives, frames, and kinematic chains | `clifford-core` |
+| [`clifford-lattice`](clifford-lattice) | Checked Spin(6) rotors, periodic lattice storage, and a portable sequential Metropolis reference kernel | `clifford-core` |
 | [`clifford-layers`](clifford-layers) | Framework-neutral Clifford linear, convolution, normalization, and optional Fourier layers | `clifford-core`, optional RustFFT |
 | [`experiment-core`](experiment-core) | Transport-neutral work, result, topology, verification, checkpoint-reference, and reproducibility contracts | Serde |
 | [`harmonic-dynamics`](harmonic-dynamics) | Safe quaternion and sphere geometry, Lohe synchronization, gated scans, and Helmholtz sequence fibers | none |
@@ -67,6 +68,7 @@ The dependency direction is intentionally one-way:
 clifford-core
 ├── clifford-field
 ├── clifford-geometry
+├── clifford-lattice
 └── clifford-layers
 
 experiment-core                 harmonic-dynamics

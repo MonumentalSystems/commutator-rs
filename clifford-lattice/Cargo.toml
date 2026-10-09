@@ -1,0 +1,26 @@
+[package]
+name = "clifford-lattice"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Validated Cl(6,0) rotor algebra and portable lattice Metropolis kernels"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/clifford-lattice"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["clifford-algebra", "lattice", "rotor", "metropolis", "simulation"]
+categories = ["mathematics", "science"]
+include = [
+    "src/**/*.rs",
+    "tests/**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "CONVENTIONS.md",
+    "LICENSE",
+    "PROVENANCE.md",
+]
+
+[dependencies]
+clifford-core = { version = "0.1.0", path = "../clifford-core" }

@@ -10,6 +10,8 @@ is versioned independently; release headings include the crate name.
 - Publish portable Cl(1,3) field operators, reference steppers, and analysis.
 - Extract fixed-size Versor geometry into `clifford-geometry` while excluding
   its duplicate simulation and hardware-backend code.
+- Extract checked Cl(6,0) rotors, periodic lattice storage, and a portable
+  sequential Metropolis reference kernel into `clifford-lattice`.
 - Extract framework-neutral Clifford neural layers into `clifford-layers`.
 - Extract safe quaternion, spherical Lohe, gated-scan, and Helmholtz reference
   dynamics into the dependency-free `harmonic-dynamics` crate.

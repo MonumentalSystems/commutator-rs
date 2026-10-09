@@ -21,7 +21,7 @@ cargo fmt --all --check
 cargo test --workspace --all-targets --all-features --locked
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 RUSTDOCFLAGS="-D warnings -D missing-docs" cargo doc --workspace --all-features --no-deps --locked
-cargo package -p clifford-core -p clifford-field -p clifford-geometry -p clifford-layers -p experiment-core -p harmonic-dynamics --locked
+cargo package -p clifford-core -p clifford-field -p clifford-geometry -p clifford-lattice -p clifford-layers -p experiment-core -p harmonic-dynamics --locked
 ```
 
 ## Compatibility fixtures
