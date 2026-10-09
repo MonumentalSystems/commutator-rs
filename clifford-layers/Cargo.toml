@@ -1,0 +1,22 @@
+[package]
+name = "clifford-layers"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Framework-neutral neural-network layers over Clifford multivectors"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/clifford-layers"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["clifford-algebra", "geometric-algebra", "neural-network", "convolution"]
+categories = ["mathematics", "science"]
+
+[features]
+default = []
+fourier = ["dep:rustfft"]
+
+[dependencies]
+clifford-core = { version = "0.1.0", path = "../clifford-core" }
+rustfft = { version = "6.2", optional = true }

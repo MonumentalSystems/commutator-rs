@@ -5,7 +5,7 @@ test, and compose.
 
 ## Before opening a change
 
-1. Keep networking, storage, identity, and scheduler concerns out of the three
+1. Keep networking, storage, identity, and scheduler concerns out of the
    foundational crates.
 2. Treat public basis ordering, normalization, serialization, and numerical
    behavior as compatibility contracts.
@@ -21,7 +21,7 @@ cargo fmt --all --check
 cargo test --workspace --all-targets --all-features --locked
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 RUSTDOCFLAGS="-D warnings -D missing-docs" cargo doc --workspace --all-features --no-deps --locked
-cargo package -p clifford-core -p clifford-field -p experiment-core --locked
+cargo package -p clifford-core -p clifford-field -p clifford-geometry -p clifford-layers -p experiment-core --locked
 ```
 
 ## Compatibility fixtures
@@ -34,5 +34,5 @@ against the cited implementation. Do not silently regenerate golden values.
 
 Keep pull requests narrow, explain user-visible behavior, and call out any
 floating-point or reproducibility impact. By contributing, you agree that your
-work is licensed under this repository's MIT License.
+work is licensed under the target crate's declared license.
 

@@ -14,7 +14,9 @@ or volunteer-computing backends.
 | --- | --- | --- |
 | [`clifford-core`](clifford-core) | Runtime-signature `Cl(p,q)`, geometric products, grades, rotors, and frozen cross-implementation conventions | none |
 | [`clifford-field`](clifford-field) | Cl(1,3) field storage, boundary operators, reference steppers, and portable numerical analysis | `clifford-core`, Rayon, Serde |
-| [`experiment-core`](experiment-core) | Transport-neutral work, result, topology, verification, checkpoint, and reproducibility contracts | Serde |
+| [`clifford-geometry`](clifford-geometry) | Fixed-size EGA, PGA, CGA, STA, and Cl(6,0) geometry with motors, conformal primitives, frames, and kinematic chains | `clifford-core` |
+| [`clifford-layers`](clifford-layers) | Framework-neutral Clifford linear, convolution, normalization, and optional Fourier layers | `clifford-core`, optional RustFFT |
+| [`experiment-core`](experiment-core) | Transport-neutral work, result, topology, verification, checkpoint-reference, and reproducibility contracts | Serde |
 
 The foundational crates deliberately do not contain HTTP, databases, identity,
 scheduling, or a particular scientific model. Those capabilities belong in
@@ -61,7 +63,10 @@ RUSTDOCFLAGS="-D warnings -D missing-docs" cargo doc --workspace --no-deps
 The dependency direction is intentionally one-way:
 
 ```text
-clifford-core  <-  clifford-field
+clifford-core
+├── clifford-field
+├── clifford-geometry
+└── clifford-layers
 
 experiment-core    (independent contracts)
        ^
@@ -86,5 +91,7 @@ their differential tests are equally strong.
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing an API or numerical
 change. Security reports should follow [SECURITY.md](SECURITY.md).
 
-Licensed under the [MIT License](LICENSE).
+The workspace is licensed under the [MIT License](LICENSE), except
+`clifford-geometry`, which preserves Versor's BSD-2-Clause license and
+attribution.
 

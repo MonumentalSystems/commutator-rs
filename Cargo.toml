@@ -1,6 +1,18 @@
 [workspace]
-members = ["clifford-core", "clifford-field", "experiment-core"]
-default-members = ["clifford-core", "clifford-field", "experiment-core"]
+members = [
+    "clifford-core",
+    "clifford-field",
+    "clifford-geometry",
+    "clifford-layers",
+    "experiment-core",
+]
+default-members = [
+    "clifford-core",
+    "clifford-field",
+    "clifford-geometry",
+    "clifford-layers",
+    "experiment-core",
+]
 resolver = "2"
 
 [workspace.package]
