@@ -39,6 +39,15 @@ verification policy, checkpoint references, worker capabilities, and run
 metadata. It does not choose an async runtime, wire format, database, or
 identity system.
 
+## Verification layer
+
+`experiment-merkle` owns a versioned SHA-256 commitment format and
+transport-neutral post-commitment spot-check messages. Roots bind experiment
+context, ordered leaf count, leaf positions, exact bytes, deterministic
+padding, and tree structure. It proves byte membership only; hosts retain
+responsibility for unpredictable nonces, sampling policy, identity, and
+independent scientific recomputation.
+
 ## Lattice layer
 
 `clifford-lattice` owns checked pure-f64 Cl⁺(6,0) elements and Spin(6)
@@ -60,7 +69,7 @@ and distributed execution remain outside its boundary.
 ## Host adapters
 
 A host may connect those layers to SIMD, Metal, CUDA, Accelerate, WebGPU,
-HTTP, databases, Merkle commitments, or volunteer-worker scheduling. Those
+HTTP, databases, identities, or volunteer-worker scheduling. Those
 adapters remain outside the foundational crates so local experiments do not
 inherit operational dependencies.
 
