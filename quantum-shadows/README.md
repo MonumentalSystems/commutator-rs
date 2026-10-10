@@ -24,6 +24,11 @@ sample, as above, need not itself lie in the physical expectation interval.
 Random-basis generation stays outside the crate so experiments can control and
 record their RNG exactly.
 
+The inverse-channel factor grows as `3^weight`. Pauli strings above weight 646
+are rejected because that factor is not finite in `f64`; lower-weight
+estimators, reductions, and confidence radii also return an explicit numerical
+overflow error rather than emitting infinity or NaN.
+
 The crate provides mean, standard-error, median-of-means, linear-observable,
 and conservative Hoeffding-radius calculations. It does not claim full quantum
 process tomography, gate-set tomography, or detector-error mitigation.
