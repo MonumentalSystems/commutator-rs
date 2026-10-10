@@ -384,6 +384,7 @@ pub fn thermal_conductance_quantum(temperature: f64) -> Result<f64> {
 
 /// Returns the Bose–Einstein occupation of an angular-frequency mode.
 pub fn bose_einstein_occupation(omega: f64, temperature: f64) -> Result<f64> {
+    finite_positive(temperature, "temperature")?;
     if !omega.is_finite() || omega < 0.0 {
         return Err(PhononError::InvalidParameter("angular frequency"));
     }
@@ -676,6 +677,20 @@ mod tests {
         let high = thermal_conductance_quantum(6.0).unwrap();
         assert!(low > 0.0);
         assert!((high / low - 3.0).abs() < 1e-14);
+    }
+
+    #[test]
+    fn bose_occupation_rejects_nonpositive_or_nonfinite_temperature() {
+        for temperature in [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(
+                bose_einstein_occupation(1.0, temperature),
+                Err(PhononError::InvalidParameter("temperature"))
+            );
+            assert_eq!(
+                bose_einstein_occupation(0.0, temperature),
+                Err(PhononError::InvalidParameter("temperature"))
+            );
+        }
     }
 
     #[test]

@@ -429,7 +429,11 @@ pub fn bethe_dmft<S: ImpuritySolver + ?Sized>(
                 history,
             });
         }
-        weiss = linear_mix_grid(&weiss, &target, config.mixing, config.causality_tolerance)?;
+        // Do not advance the Weiss field after the final permitted solver call:
+        // the returned impurity solution must describe the returned Weiss field.
+        if iteration + 1 < config.maximum_iterations {
+            weiss = linear_mix_grid(&weiss, &target, config.mixing, config.causality_tolerance)?;
+        }
     }
     Ok(DmftOutcome {
         weiss,

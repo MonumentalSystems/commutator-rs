@@ -182,3 +182,51 @@ fn bethe_noninteracting_fixed_point_converges_in_one_iteration() {
     assert_eq!(outcome.history.iterations().len(), 1);
     assert!(outcome.history.iterations()[0].residual < 1.0e-12);
 }
+
+#[test]
+fn nonconverged_outcome_keeps_weiss_and_impurity_solution_consistent() {
+    let frequency = Complex64::new(0.0, 1.0);
+    let initial_value = Complex64::new(0.0, -0.4);
+    let initial = WeissFieldGrid::try_new(
+        MatrixFrequencyGrid::try_new(vec![frequency], vec![scalar(initial_value)]).unwrap(),
+        1.0e-12,
+    )
+    .unwrap();
+    let model = HubbardModel::try_new(scalar(0.0.into()), vec![0.0], 0.0).unwrap();
+    let mut solver = |problem: &cluster_embedding::ImpurityProblem| {
+        let green = ClusterGreenGrid::try_new(
+            1,
+            vec![GreenPoint::new(
+                frequency,
+                problem.weiss.grid().matrices()[0].clone(),
+            )],
+        )?;
+        ImpuritySolution::try_new(
+            green,
+            MatrixFrequencyGrid::try_new(vec![frequency], vec![scalar(0.0.into())])?,
+            1.0e-12,
+        )
+    };
+    let outcome = bethe_dmft(
+        &mut solver,
+        &model,
+        BetheLattice::try_new(0.5).unwrap(),
+        initial,
+        DmftConfig {
+            maximum_iterations: 1,
+            mixing: 0.5,
+            convergence_tolerance: 1.0e-15,
+            causality_tolerance: 1.0e-12,
+        },
+    )
+    .unwrap();
+
+    assert!(!outcome.converged);
+    let returned_weiss = outcome.weiss.grid().matrices()[0].get(0, 0).unwrap();
+    let solved_weiss = outcome.impurity.green().points()[0]
+        .green
+        .get(0, 0)
+        .unwrap();
+    assert!((returned_weiss - initial_value).norm() < 1.0e-14);
+    assert!((solved_weiss - returned_weiss).norm() < 1.0e-14);
+}
