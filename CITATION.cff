@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: >-
+  If you use commutator-rs in research, cite the software release and the
+  specific crate versions used. Cite associated method papers when a crate
+  release links one.
+title: "commutator-rs: Rust foundations for Clifford and computational physics"
+type: software
+authors:
+  - name: Monumental Systems
+repository-code: "https://github.com/MonumentalSystems/commutator-rs"
+url: "https://commutator.science"
+keywords:
+  - Rust
+  - Clifford algebra
+  - computational physics
+  - quantum physics
+  - reproducible research

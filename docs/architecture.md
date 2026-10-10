@@ -61,6 +61,14 @@ padding, and tree structure. It proves byte membership only; hosts retain
 responsibility for unpredictable nonces, sampling policy, identity, and
 independent scientific recomputation.
 
+`experiment-accelerator` sits outside that commitment primitive. It owns
+backend descriptors, deterministic partition plans, and differential
+qualification reports that compare an optimized implementation with a
+portable reference. Reports bind work content, worker identity, backend IDs,
+implementation versions, precision, and tolerances. The crate contains no
+hardware API or network transport and does not turn an untrusted serialized
+report into an admission token.
+
 ## Lattice layer
 
 `clifford-lattice` owns checked pure-f64 Cl⁺(6,0) elements and Spin(6)
@@ -89,13 +97,25 @@ contract and leaves large solvers or deployment concerns outside.
   diagnostics.
 - `quantum-chaos` owns diagnostics over supplied spectra.
 - `quantum-magnetism` owns finite spin-1/2 reference Hamiltonians and
-  observables; `spin-lattice` owns classical magnetoelastic dynamics.
+  observables; `spin-lattice` owns classical magnetoelastic dynamics; and
+  `phonon-transport` owns harmonic-chain and ballistic thermal references.
 - `superconductivity` owns checked BdG assembly and observables;
-  `majorana-fermions` owns sparse Majorana operator algebra.
+  `superconducting-dynamics` owns gauge-covariant TDGL and Josephson dynamics;
+  and `majorana-fermions` owns sparse Majorana operator algebra.
 - `cluster-green` owns cluster Green-function validation and embedding;
-  `quantum-transport` consumes its matrix convention for coherent NEGF.
+  `cluster-embedding` builds solver-injected VCA/DMFT foundations on it;
+  `keldysh-green` reuses its matrices for real-time nonequilibrium Green
+  functions; and `quantum-transport` consumes the same convention for
+  coherent NEGF.
 - `quantum-light` owns bounded photonic Fock states and counting observables;
-  `quantum-shadows` owns local-Pauli measurement reduction.
+  `open-quantum-systems` owns dense Lindblad reference dynamics;
+  `quantum-shadows` owns local-Pauli measurement reduction; and
+  `quantum-tomography` owns state/PTM/Choi reconstruction diagnostics plus a
+  focused gate-set model.
+
+`physics-conformance` is a workspace-only consumer of public APIs. It owns no
+scientific implementation and is not released to crates.io; its purpose is to
+detect convention drift across independently publishable packages.
 
 See [`research-suite.md`](research-suite.md) for workflows and non-goals.
 
@@ -105,4 +125,28 @@ A host may connect those layers to SIMD, Metal, CUDA, Accelerate, WebGPU,
 HTTP, databases, identities, or volunteer-worker scheduling. Those
 adapters remain outside the foundational crates so local experiments do not
 inherit operational dependencies.
+
+The allowed dependency direction for the advanced suite is:
+
+```text
+clifford-core
+├── clifford-field / geometry / lattice / layers
+├── harmonic-dynamics
+├── majorana-fermions
+└── clifford-geometry ──> clifford-mesh (optional feature)
+
+cluster-green
+├── cluster-embedding
+├── keldysh-green
+└── quantum-transport
+
+open-quantum-systems ──> quantum-tomography
+experiment-core ───────> experiment-merkle / experiment-accelerator
+
+selected public APIs ──> physics-conformance (workspace-only)
+```
+
+Crates omitted from the arrows are independent at the package level. A
+scientific conversion such as TDGL order parameters to BdG onsite gaps may be
+kept dependency-neutral when a shared scalar/vector boundary is sufficient.
 

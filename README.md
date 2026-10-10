@@ -19,18 +19,29 @@ or volunteer-computing backends.
 | [`clifford-layers`](clifford-layers) | Framework-neutral Clifford linear, convolution, normalization, and optional Fourier layers | `clifford-core`, optional RustFFT |
 | [`clifford-mesh`](clifford-mesh) | Checked renderer-independent topology, Euclidean tessellators, and optional CGA adapters | optional `clifford-geometry` |
 | [`experiment-core`](experiment-core) | Transport-neutral work, result, topology, verification, checkpoint-reference, and reproducibility contracts | Serde |
+| [`experiment-accelerator`](experiment-accelerator) | Backend descriptors, deterministic partition plans, and differential qualification of CPU/GPU/distributed experiment adapters | `experiment-core`, Serde, SHA-2 |
 | [`experiment-merkle`](experiment-merkle) | Context-bound SHA-256 commitments, inclusion proofs, and deterministic post-commitment spot checks | `experiment-core`, Serde, SHA-2 |
-| [`harmonic-dynamics`](harmonic-dynamics) | Safe `S¹`/Kuramoto, quaternion and sphere geometry, Lohe synchronization, gated scans, and Helmholtz sequence fibers | none |
+| [`harmonic-dynamics`](harmonic-dynamics) | Safe `S¹`/Kuramoto, quaternion and sphere geometry, Lohe synchronization, gated scans, and Clifford-compatible Helmholtz sequence fibers | none (Clifford conformance in dev tests) |
 | [`field-lyapunov`](field-lyapunov) | Matrix-free top-k Lyapunov spectra, finite-time estimates, RK4 tangent flow, and chaos diagnostics | none |
 | [`quantum-chaos`](quantum-chaos) | Level-spacing ratios, spectral form factors, number variance, and explicit unfolding policies | `num-complex` |
 | [`quantum-magnetism`](quantum-magnetism) | Matrix-free finite spin-1/2 models, frustrated exchange, observables, and reference Lanczos | `num-complex` |
 | [`spin-lattice`](spin-lattice) | Coupled harmonic lattice and distance-dependent Heisenberg dynamics from one checked Hamiltonian | none |
+| [`phonon-transport`](phonon-transport) | Harmonic-chain bands, branch-tracked group velocities, heat capacity, and ballistic thermal conductance | `num-complex` |
 | [`superconductivity`](superconductivity) | Spinful onsite s-wave BdG assembly, symmetry checks, LDOS, and pairing observables | `num-complex` |
+| [`superconducting-dynamics`](superconducting-dynamics) | Gauge-covariant graph TDGL, energy-monotone reference evolution, flux, and Josephson observables | `num-complex` |
 | [`majorana-fermions`](majorana-fermions) | Sparse Majorana/fermion operator algebra and quadratic Kitaev-chain Hamiltonians | `num-complex` |
 | [`cluster-green`](cluster-green) | Checked cluster Green functions, causality, CPT/Dyson embedding, and periodization | `num-complex` |
+| [`cluster-embedding`](cluster-embedding) | Solver-injected Hubbard reference systems, VCA stationarity, and retarded DMFT embedding | `cluster-green`, `num-complex` |
+| [`keldysh-green`](keldysh-green) | Real-time Keldysh components, Langreth products, observables, and a dense retarded Dyson reference solver | `cluster-green` |
 | [`quantum-transport`](quantum-transport) | Coherent NEGF device Green functions, broadenings, Caroli transmission, and Landauer current | `cluster-green` |
+| [`open-quantum-systems`](open-quantum-systems) | Dense Lindblad reference dynamics, physical density matrices, and fixed-step RK4 | `num-complex` |
 | [`quantum-light`](quantum-light) | Finite Fock states, passive optics, photon statistics, and reduced density matrices | `num-complex` |
 | [`quantum-shadows`](quantum-shadows) | Local-Pauli classical-shadow estimators and robust uncertainty reductions | none |
+| [`quantum-tomography`](quantum-tomography) | Local-Pauli state reconstruction, PTM/Choi channel diagnostics, and focused gate-set likelihood tools | `open-quantum-systems` |
+
+[`physics-conformance`](physics-conformance) is a non-publishable workspace
+crate. It exercises convention and interoperability boundaries across the
+independently versioned physics crates using only their public APIs.
 
 The foundational crates deliberately do not contain HTTP, databases, identity,
 scheduling, or a particular scientific model. Those capabilities belong in
@@ -86,28 +97,39 @@ clifford-core
 clifford-mesh
 (independent by default; optional CGA adapters consume clifford-geometry)
 
-experiment-core                 harmonic-dynamics
-      └── experiment-merkle      (independent numerical dynamics)
-                 ^                           ^
-                 +-------------+-------------+
-                               |
-        host runtimes, optimized backends, and distributed schedulers
+experiment-core                    clifford-core
+├── experiment-merkle              ├── harmonic-dynamics
+└── experiment-accelerator         └── majorana-fermions
+          ^
+          |
+host runtimes and hardware backends
 
 field-lyapunov          quantum-chaos
       |                       |
       +------ dynamics -------+
 
-quantum-magnetism       spin-lattice       superconductivity
-                              |                    |
-majorana-fermions       cluster-green ---- quantum-transport
+quantum-magnetism      spin-lattice      phonon-transport
+
+superconductivity ---- interoperability ---- superconducting-dynamics
+
+cluster-green
+├── cluster-embedding
+├── keldysh-green
+└── quantum-transport
+
+open-quantum-systems ---- quantum-tomography
 
 quantum-light           quantum-shadows
+
+physics-conformance (workspace-only cross-crate tests)
 ```
 
 See [Architecture](docs/architecture.md) for the crate boundaries and
 [Distributed science](docs/distributed-science.md) for the adapter model.
 See [Research suite](docs/research-suite.md) for scientific workflows,
 interoperability boundaries, and deliberate non-goals.
+See [Release and provenance](docs/releasing.md) for dependency-safe publication
+waves, package verification, checksums, and citation metadata.
 The algebra conventions and golden vectors are versioned in
 [`clifford-core/CONVENTIONS.md`](clifford-core/CONVENTIONS.md).
 
