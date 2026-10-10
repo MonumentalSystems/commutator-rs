@@ -12,9 +12,10 @@ The crate contains:
 - bivector exponentials and rotors;
 - conformal frames, shapes, kinematic chains, twists, interpolation, and
   three-dimensional scalar/vector fields;
-- checked decomposition of conformal points and real dual spheres into
-  Euclidean parameters, with homogeneous normalization when scaled `f32`
-  coefficients retain the represented semantics;
+- checked decomposition of conformal points, real dual spheres, and direct or
+  compact dual planes into Euclidean parameters, with homogeneous
+  normalization when scaled `f32` coefficients retain the represented
+  semantics;
 - explicit adapters to the dense, precision-generic `clifford-core` engine.
 
 It deliberately excludes lattice dynamics, simulation dispatch, SIMD, GPU
@@ -46,9 +47,28 @@ assert!((parameters.radius() - 2.5).abs() < 1e-5);
 # Ok::<(), clifford_geometry::cga3d::decomposition::DecompositionError>(())
 ```
 
+Planes are returned in normalized Hesse form `normal · x + d = 0`. Direct and
+dual layouts have explicit entry points because `Pln` and `Dlp` are aliases of
+the same Rust type:
+
+```rust
+use clifford_geometry::cga3d::decomposition::decompose_dual_plane;
+use clifford_geometry::mvec::Multivector;
+
+// Compact dual plane: 2x - 3y + 6z - 7 = 0.
+let plane = Multivector::new([2.0, -3.0, 6.0, -7.0]);
+let parameters = decompose_dual_plane(&plane)?;
+assert_eq!(parameters.signed_distance_from_origin(), -1.0);
+assert_eq!(parameters.closest_point(), [2.0 / 7.0, -3.0 / 7.0, 6.0 / 7.0]);
+# Ok::<(), clifford_geometry::cga3d::decomposition::DecompositionError>(())
+```
+
 The older `Round::location`, `Round::center`, and `Round::radius_squared`
 helpers remain available for source compatibility, but are unchecked and keep
-their historical degenerate-value fallbacks.
+their historical degenerate-value fallbacks. Likewise, `dual_pln` and
+`undual_dlp` remain algebraic compatibility operations, but their generated
+mapping between the compressed direct and dual layouts drops semantic plane
+offsets; use the explicitly named checked plane decomposers at API boundaries.
 
 ## Compatibility conventions
 
@@ -58,6 +78,11 @@ commutators return raw `AB - BA`, while `clifford-core` returns
 from `clifford-core::CliffordAlgebra::rotor_from_bivector`. The
 [`adapter`](https://docs.rs/clifford-geometry/latest/clifford_geometry/adapter/)
 module makes those differences explicit.
+
+The checked direct-plane decomposer deliberately corrects the extracted
+renderer helper's closest-point sign and replaces its zero-normal fallback
+with an error. It reads the direct `[e1235, e1245, e1345, e2345]` layout
+without routing through the lossy legacy dual projection.
 
 The named sparse types remain aliases of `Multivector<N>`. For example, two
 different three-component aliases are not nominally distinct Rust types.

@@ -37,12 +37,13 @@ from caller-owned buffers retain the caller's winding. UV spheres use unique
 poles; open cylinders are intentionally uncapped. Circular/grid resolutions
 are limited to 1,024 and icosphere subdivision to 7 before allocation.
 
-CGA circle, line, and plane adapters are intentionally deferred. The original
+CGA circle and line adapters are intentionally deferred. The original
 Versor-Rust drawing module's heuristic decoders do not preserve the required
 translation and homogeneous-scaling semantics. Checked point-cloud and
-real-dual-sphere adapters are available behind `cga3d`; they consume the
-semantic decomposition API in `clifford-geometry` rather than inspecting
-sparse blade slots here.
+real-dual-sphere adapters are available behind `cga3d`; a plane adapter remains
+a separate follow-up now that checked direct- and compact-dual-plane
+decomposition exists in `clifford-geometry`. Mesh adapters consume those
+semantic APIs rather than inspecting sparse blade slots here.
 
 ```rust
 # #[cfg(feature = "cga3d")]

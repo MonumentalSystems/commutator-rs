@@ -1,17 +1,18 @@
 //! Checked conversion from sparse CGA vectors to Euclidean parameters.
 //!
-//! [`Pnt`] and [`Dls`] are representation aliases, so these functions require
-//! the caller to supply the semantic form named by the function. They accept
-//! finite, representable nonzero homogeneous scaling, including negative
-//! scaling, when the scaled `f32` coefficients retain the element's semantics.
-//! The sparse basis is `[e1, e2, e3, e4, e5]`, with metric
-//! `[+1, +1, +1, +1, -1]` and homogeneous weight `w = e5 - e4`.
+//! [`Pnt`] / [`Dls`] and [`Dlp`] / [`Pln`] are representation aliases, so these
+//! functions require the caller to supply the semantic form and layout named
+//! by the function. They accept finite, representable nonzero homogeneous
+//! scaling when the scaled `f32` coefficients retain the element's semantics.
+//! Point and sphere decomposition uses sparse basis `[e1, e2, e3, e4, e5]`,
+//! metric `[+1, +1, +1, +1, -1]`, and homogeneous weight `w = e5 - e4`.
+//! Plane decomposition produces normalized Hesse form `normal · x + d = 0`.
 //! Input coefficients are widened to `f64` before subtraction, products, and
 //! division; public results retain the crate's established `f32` precision.
 
 use core::fmt;
 
-use super::{point, Dls, Pnt};
+use super::{point, Dlp, Dls, Pln, Pnt};
 
 /// Failure to decompose a conformal vector into finite Euclidean parameters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,12 +22,14 @@ pub enum DecompositionError {
     NonFiniteInput,
     /// The conformal vector had zero homogeneous weight.
     DegenerateHomogeneousWeight,
-    /// Decomposition produced a value outside finite `f32` range.
+    /// Decomposition produced a value unsupported by the finite `f32` output contract.
     OutputOutOfRange,
     /// A value supplied as a conformal point did not match canonical point form.
     NonNullPoint,
     /// A dual sphere had negative squared radius.
     ImaginaryDualSphere,
+    /// A plane had no finite nonzero Euclidean normal.
+    DegeneratePlaneNormal,
 }
 
 impl fmt::Display for DecompositionError {
@@ -39,13 +42,16 @@ impl fmt::Display for DecompositionError {
                 formatter.write_str("CGA vector has zero homogeneous weight")
             }
             Self::OutputOutOfRange => {
-                formatter.write_str("CGA decomposition is outside finite f32 range")
+                formatter.write_str("CGA decomposition cannot be represented by its f32 output")
             }
             Self::NonNullPoint => {
                 formatter.write_str("CGA point does not have canonical null-point form")
             }
             Self::ImaginaryDualSphere => {
                 formatter.write_str("CGA dual sphere has imaginary radius")
+            }
+            Self::DegeneratePlaneNormal => {
+                formatter.write_str("CGA plane must have a nonzero Euclidean normal")
             }
         }
     }
@@ -71,6 +77,36 @@ impl PointDecomposition {
 pub struct DualSphereDecomposition {
     center: [f32; 3],
     radius: f32,
+}
+
+/// Finite normalized Euclidean parameters extracted from a CGA plane.
+///
+/// The returned values use Hesse form `normal · x + d = 0`. The normal has
+/// unit length and `d` is the signed distance obtained by evaluating that
+/// equation at the origin. Negating the source's homogeneous scale preserves
+/// the plane locus and closest point while reversing the normal and `d`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PlaneDecomposition {
+    closest_point: [f32; 3],
+    normal: [f32; 3],
+    signed_distance_from_origin: f32,
+}
+
+impl PlaneDecomposition {
+    /// Point on the plane nearest the Euclidean origin.
+    pub const fn closest_point(self) -> [f32; 3] {
+        self.closest_point
+    }
+
+    /// Representative-oriented unit normal.
+    pub const fn normal(self) -> [f32; 3] {
+        self.normal
+    }
+
+    /// Signed distance term `d` in `normal · x + d = 0`.
+    pub const fn signed_distance_from_origin(self) -> f32 {
+        self.signed_distance_from_origin
+    }
 }
 
 impl DualSphereDecomposition {
@@ -135,7 +171,101 @@ pub fn decompose_real_dual_sphere(
     Ok(DualSphereDecomposition { center, radius })
 }
 
+/// Decomposes a compact semantic dual plane into normalized Euclidean form.
+///
+/// The input layout is `[n_x, n_y, n_z, q]`, representing the equation
+/// `n · x + q = 0`. This compact public layout is decoded directly; it must not
+/// be preprocessed with [`super::undual_dlp`] because the legacy sparse dual
+/// mapping drops its semantic offset. A finite exactly-zero normal is rejected
+/// without an epsilon fallback. A nonzero normalized offset too small or large
+/// for the public `f32` result is rejected rather than rounded onto a different
+/// plane locus.
+pub fn decompose_dual_plane(value: &Dlp) -> Result<PlaneDecomposition, DecompositionError> {
+    let coefficients = finite_plane_coefficients(value)?;
+    decompose_plane_coefficients(
+        [coefficients[0], coefficients[1], coefficients[2]],
+        coefficients[3],
+    )
+}
+
+/// Decomposes a direct CGA plane into normalized Euclidean form.
+///
+/// The direct layout is `[e1235, e1245, e1345, e2345]`. Its raw Euclidean
+/// equation has `normal = [e2345, -e1345, e1245]` and offset `e1235`.
+/// Reading this layout directly preserves translated-plane offsets that the
+/// legacy [`super::dual_pln`] projection drops. A finite exactly-zero normal
+/// is rejected without an epsilon fallback. A nonzero normalized offset too
+/// small or large for the public `f32` result is rejected rather than rounded
+/// onto a different plane locus.
+pub fn decompose_direct_plane(value: &Pln) -> Result<PlaneDecomposition, DecompositionError> {
+    let coefficients = finite_plane_coefficients(value)?;
+    decompose_plane_coefficients(
+        [coefficients[3], -coefficients[2], coefficients[1]],
+        coefficients[0],
+    )
+}
+
+fn decompose_plane_coefficients(
+    normal: [f64; 3],
+    offset: f64,
+) -> Result<PlaneDecomposition, DecompositionError> {
+    let scale = normal
+        .iter()
+        .map(|component| component.abs())
+        .fold(0.0_f64, f64::max);
+    if scale == 0.0 {
+        return Err(DecompositionError::DegeneratePlaneNormal);
+    }
+    let scaled_normal = normal.map(|component| component / scale);
+    let scaled_length = scaled_normal
+        .iter()
+        .map(|component| component * component)
+        .sum::<f64>()
+        .sqrt();
+    let unit_normal_f64 = scaled_normal.map(|component| component / scaled_length);
+    let signed_distance_f64 = (offset / scale) / scaled_length;
+    let closest_point_f64 = unit_normal_f64.map(|component| -signed_distance_f64 * component);
+
+    let normal = finite_f32_array(unit_normal_f64)?;
+    let closest_point = finite_f32_array(closest_point_f64)?;
+    let signed_distance_from_origin = finite_f32_scalar(signed_distance_f64)?;
+    Ok(PlaneDecomposition {
+        closest_point,
+        normal,
+        signed_distance_from_origin,
+    })
+}
+
+fn finite_f32_scalar(value: f64) -> Result<f32, DecompositionError> {
+    let narrowed = value as f32;
+    if !narrowed.is_finite() || (value != 0.0 && narrowed == 0.0) {
+        Err(DecompositionError::OutputOutOfRange)
+    } else {
+        Ok(narrowed)
+    }
+}
+
+fn finite_f32_array<const N: usize>(values: [f64; N]) -> Result<[f32; N], DecompositionError> {
+    let values = values.map(|value| value as f32);
+    if values.iter().any(|value| !value.is_finite()) {
+        Err(DecompositionError::OutputOutOfRange)
+    } else {
+        Ok(values)
+    }
+}
+
 fn finite_coefficients(value: &Pnt) -> Result<[f64; 5], DecompositionError> {
+    if value
+        .data
+        .iter()
+        .any(|coefficient| !coefficient.is_finite())
+    {
+        return Err(DecompositionError::NonFiniteInput);
+    }
+    Ok(core::array::from_fn(|index| f64::from(value[index])))
+}
+
+fn finite_plane_coefficients(value: &Pln) -> Result<[f64; 4], DecompositionError> {
     if value
         .data
         .iter()

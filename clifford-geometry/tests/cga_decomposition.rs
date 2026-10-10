@@ -1,7 +1,10 @@
 use clifford_geometry::cga3d::decomposition::{
-    decompose_point, decompose_real_dual_sphere, DecompositionError,
+    decompose_direct_plane, decompose_dual_plane, decompose_point, decompose_real_dual_sphere,
+    DecompositionError,
 };
-use clifford_geometry::cga3d::{biv, point, spin_rot_pnt, translate, Gen, Round};
+use clifford_geometry::cga3d::{
+    biv, op_par_pnt, op_pnt_pnt, point, spin_mot_dlp, spin_rot_pnt, translate, Gen, Round,
+};
 use clifford_geometry::mvec::Multivector;
 
 fn assert_vec3_close(actual: [f32; 3], expected: [f32; 3], tolerance: f32) {
@@ -275,4 +278,188 @@ fn decomposition_is_equivariant_under_translation_and_rotation() {
     let rotated_parameters = decompose_real_dual_sphere(&rotated_sphere).unwrap();
     assert_vec3_close(rotated_parameters.center(), [-2.0, 1.0, -0.5], 2e-5);
     assert!((rotated_parameters.radius() - 1.25).abs() <= 2e-5);
+}
+
+#[test]
+fn dual_plane_decomposition_uses_normalized_hesse_form() {
+    let plane = Multivector::new([2.0, -3.0, 6.0, -7.0]);
+    let parameters = decompose_dual_plane(&plane).unwrap();
+    let expected = [2.0 / 7.0, -3.0 / 7.0, 6.0 / 7.0];
+    assert_vec3_close(parameters.normal(), expected, f32::EPSILON);
+    assert_eq!(parameters.signed_distance_from_origin(), -1.0);
+    assert_vec3_close(parameters.closest_point(), expected, f32::EPSILON);
+
+    let axis_plane = decompose_dual_plane(&Multivector::new([1.0, 0.0, 0.0, -2.0])).unwrap();
+    assert_eq!(axis_plane.normal(), [1.0, 0.0, 0.0]);
+    assert_eq!(axis_plane.signed_distance_from_origin(), -2.0);
+    assert_eq!(axis_plane.closest_point(), [2.0, 0.0, 0.0]);
+}
+
+#[test]
+fn direct_plane_decomposition_preserves_offset_and_basis_signs() {
+    let direct = Multivector::new([-7.0, 6.0, 3.0, 2.0]);
+    let dual = Multivector::new([2.0, -3.0, 6.0, -7.0]);
+    assert_eq!(
+        decompose_direct_plane(&direct).unwrap(),
+        decompose_dual_plane(&dual).unwrap()
+    );
+
+    for (value, expected_normal) in [
+        (Multivector::new([0.0, 0.0, 0.0, 1.0]), [1.0, 0.0, 0.0]),
+        (Multivector::new([0.0, 0.0, -1.0, 0.0]), [0.0, 1.0, 0.0]),
+        (Multivector::new([0.0, 1.0, 0.0, 0.0]), [0.0, 0.0, 1.0]),
+    ] {
+        assert_eq!(
+            decompose_direct_plane(&value).unwrap().normal(),
+            expected_normal
+        );
+    }
+
+    // Regression for the legacy renderer sign bug: this carrier represents
+    // z=3, not z=-3.
+    let z_three = decompose_direct_plane(&Multivector::new([24.0, -8.0, 0.0, 0.0])).unwrap();
+    assert_eq!(z_three.normal(), [0.0, 0.0, -1.0]);
+    assert_eq!(z_three.signed_distance_from_origin(), 3.0);
+    assert_eq!(z_three.closest_point(), [0.0, 0.0, 3.0]);
+}
+
+#[test]
+fn plane_decomposition_preserves_representative_orientation() {
+    let dual = Multivector::new([2.0, -3.0, 6.0, -7.0]);
+    let direct = Multivector::new([-7.0, 6.0, 3.0, 2.0]);
+    let expected = decompose_dual_plane(&dual).unwrap();
+
+    for scale in [1.0 / 4096.0_f32, 1.0, 65_536.0] {
+        assert_eq!(decompose_dual_plane(&(dual * scale)).unwrap(), expected);
+        assert_eq!(decompose_direct_plane(&(direct * scale)).unwrap(), expected);
+    }
+
+    let reversed = decompose_dual_plane(&(dual * -8.0)).unwrap();
+    assert_eq!(reversed.closest_point(), expected.closest_point());
+    assert_vec3_close(
+        reversed.normal(),
+        expected.normal().map(|component| -component),
+        f32::EPSILON,
+    );
+    assert_eq!(
+        reversed.signed_distance_from_origin(),
+        -expected.signed_distance_from_origin()
+    );
+    assert_eq!(decompose_direct_plane(&(direct * -8.0)).unwrap(), reversed);
+
+    for scale in [1.3_f32, -3.5] {
+        let actual = decompose_dual_plane(&(dual * scale)).unwrap();
+        let orientation = scale.signum();
+        assert_vec3_close(
+            actual.normal(),
+            expected.normal().map(|component| component * orientation),
+            2e-7,
+        );
+        assert!(
+            (actual.signed_distance_from_origin()
+                - expected.signed_distance_from_origin() * orientation)
+                .abs()
+                <= 2e-7
+        );
+        assert_vec3_close(actual.closest_point(), expected.closest_point(), 2e-7);
+    }
+}
+
+#[test]
+fn direct_plane_from_translated_points_has_the_correct_locus() {
+    let a = point(0.0, 0.0, 3.0);
+    let b = point(1.0, 0.0, 3.0);
+    let c = point(0.0, 1.0, 3.0);
+    let plane = Round::carrier_circle(&op_par_pnt(&op_pnt_pnt(&a, &b), &c));
+    let parameters = decompose_direct_plane(&plane).unwrap();
+    assert_vec3_close(parameters.closest_point(), [0.0, 0.0, 3.0], 2e-5);
+    assert!((parameters.normal()[2].abs() - 1.0).abs() <= f32::EPSILON);
+    for value in [a, b, c] {
+        let position = decompose_point(&value).unwrap().position();
+        let residual = parameters
+            .normal()
+            .iter()
+            .zip(position)
+            .map(|(normal, coordinate)| normal * coordinate)
+            .sum::<f32>()
+            + parameters.signed_distance_from_origin();
+        assert!(residual.abs() <= 2e-5);
+    }
+}
+
+#[test]
+fn dual_plane_rotation_preserves_offset_and_rotates_normal() {
+    let plane = Multivector::new([1.0, 0.0, 0.0, -2.0]);
+    let rotor = Gen::rot(&biv(core::f32::consts::FRAC_PI_2, 0.0, 0.0));
+    let rotated = spin_mot_dlp(&Gen::rot_as_mot(&rotor), &plane);
+    let parameters = decompose_dual_plane(&rotated).unwrap();
+    assert_vec3_close(parameters.normal(), [0.0, 1.0, 0.0], 2e-5);
+    assert!((parameters.signed_distance_from_origin() + 2.0).abs() <= 2e-5);
+    assert_vec3_close(parameters.closest_point(), [0.0, 2.0, 0.0], 2e-5);
+}
+
+#[test]
+fn plane_decomposition_rejects_degenerate_and_nonfinite_inputs() {
+    for value in [
+        Multivector::new([0.0, 0.0, 0.0, 0.0]),
+        Multivector::new([0.0, 0.0, 0.0, 1.0]),
+    ] {
+        assert_eq!(
+            decompose_dual_plane(&value),
+            Err(DecompositionError::DegeneratePlaneNormal)
+        );
+    }
+    for value in [
+        Multivector::new([0.0, 0.0, 0.0, 0.0]),
+        Multivector::new([1.0, 0.0, 0.0, 0.0]),
+    ] {
+        assert_eq!(
+            decompose_direct_plane(&value),
+            Err(DecompositionError::DegeneratePlaneNormal)
+        );
+    }
+    for index in 0..4 {
+        for invalid in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let mut coefficients = [1.0, 2.0, 3.0, 4.0];
+            coefficients[index] = invalid;
+            let value = Multivector::new(coefficients);
+            assert_eq!(
+                decompose_dual_plane(&value),
+                Err(DecompositionError::NonFiniteInput)
+            );
+            assert_eq!(
+                decompose_direct_plane(&value),
+                Err(DecompositionError::NonFiniteInput)
+            );
+        }
+    }
+}
+
+#[test]
+fn plane_decomposition_handles_full_f32_exponent_range() {
+    let subnormal = f32::from_bits(1);
+    let tiny = decompose_dual_plane(&Multivector::new([subnormal, 0.0, 0.0, subnormal])).unwrap();
+    assert_eq!(tiny.normal(), [1.0, 0.0, 0.0]);
+    assert_eq!(tiny.signed_distance_from_origin(), 1.0);
+    assert_eq!(tiny.closest_point(), [-1.0, 0.0, 0.0]);
+
+    let largest = decompose_dual_plane(&Multivector::new([f32::MAX; 4])).unwrap();
+    let inverse_sqrt_three = 1.0 / 3.0_f32.sqrt();
+    assert_vec3_close(largest.normal(), [inverse_sqrt_three; 3], f32::EPSILON);
+    assert!((largest.signed_distance_from_origin() - inverse_sqrt_three).abs() <= f32::EPSILON);
+    assert_vec3_close(largest.closest_point(), [-1.0 / 3.0; 3], f32::EPSILON);
+
+    assert_eq!(
+        decompose_dual_plane(&Multivector::new([subnormal, 0.0, 0.0, f32::MAX,])),
+        Err(DecompositionError::OutputOutOfRange)
+    );
+
+    assert_eq!(
+        decompose_dual_plane(&Multivector::new([f32::MAX, 0.0, 0.0, subnormal,])),
+        Err(DecompositionError::OutputOutOfRange)
+    );
+    assert_eq!(
+        decompose_direct_plane(&Multivector::new([subnormal, 0.0, 0.0, f32::MAX,])),
+        Err(DecompositionError::OutputOutOfRange)
+    );
 }

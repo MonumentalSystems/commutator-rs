@@ -23,7 +23,9 @@ and Cl(6,0) types together with rotors, motors, meet/join operations, frames,
 interpolation, and kinematic chains. It preserves Versor's sparse typed
 geometry model while using `clifford-core` as the canonical convention and
 conformance boundary. Checked point and real dual-sphere decomposition provides
-the semantic boundary for consumers without exposing sparse blade positions.
+the semantic boundary for consumers without exposing sparse blade positions;
+checked direct- and compact-dual-plane decomposition provides normalized Hesse
+parameters without relying on the lossy legacy plane dual projection.
 Rendering, field simulation, and hardware backends are outside this crate.
 
 ## Layer library
@@ -40,8 +42,8 @@ indexed-triangle buffers plus bounded Euclidean primitive tessellators. Its
 default build is independent of graphics runtimes and algebra representations.
 The optional `cga3d` feature consumes `clifford-geometry`'s checked point and
 real-dual-sphere decomposition without decoding sparse blade positions itself.
-CGA circle, line, and plane adapters remain deferred until matching checked
-semantic decomposition APIs exist.
+A checked plane adapter remains a separate integration slice; CGA circle and
+line adapters remain deferred until matching semantic decomposition APIs exist.
 
 ## Experiment layer
 
