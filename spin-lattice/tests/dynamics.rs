@@ -139,7 +139,7 @@ fn effective_field_is_negative_spin_energy_gradient() {
 }
 
 #[test]
-fn magnetization_and_coupled_step_are_finite() {
+fn magnetization_and_palindromic_coupled_step_are_finite() {
     let model = two_atom_model(2.0, 0.8, -0.2);
     let mut state = SpinLatticeState::try_new(
         &model,

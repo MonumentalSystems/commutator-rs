@@ -18,7 +18,7 @@ J_ij(r) = J0_ij + dJdr_ij (r - |r_ij^0|).
 The lattice kinetic energy is `sum_i |p_i|^2 / (2 m_i)`. Spins are
 dimensionless unit vectors. The crate supplies velocity Verlet for lattice
 motion, exact frozen-field Rodrigues rotations for spin precession, and a
-symmetric spin/lattice/spin coupled step.
+palindromic half-spin/full-lattice/half-spin coupled step.
 
 ```rust
 use spin_lattice::{Bond, LinearExchange, SpinLatticeModel, SpinLatticeState, Vec3};
@@ -51,9 +51,12 @@ magnetoelastic experiments.
 
 The spin step solves precession in fields frozen at the beginning of each
 substep. It exactly preserves each spin norm but is not an exact many-spin
-flow. The coupled step uses Strang ordering: half spin, full lattice, half
-spin. Time, energy, and gyromagnetic units are chosen consistently by the
-caller.
+flow. The coupled step uses palindromic ordering: half spin, full lattice,
+half spin. Because the interacting-spin substep freezes all effective fields at
+its start, that substep is first-order and is not self-adjoint. Consequently,
+the coupled composition is not generally time-reversible or a second-order
+Strang integrator despite its palindromic ordering. Time, energy, and
+gyromagnetic units are chosen consistently by the caller.
 
 ## License
 
