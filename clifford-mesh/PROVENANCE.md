@@ -17,8 +17,10 @@ The optional `cga3d` adapters are new composition over the checked point and
 real-dual-sphere decomposition API in `clifford-geometry`; they do not preserve
 the source module's tolerance-based classification, imaginary-radius absolute
 value, or fabricated tiny spheres. Circle, line, and plane adapters remain
-deferred pending semantic decomposition and conformance tests. This crate does
-not claim parity with C++ Versor's visualization layer.
+outside the current API; checked plane decomposition now exists in
+`clifford-geometry`, while circle and line decomposition still require
+conformance work. This crate does not claim parity with C++ Versor's
+visualization layer.
 
 The extracted and redesigned implementation retains the upstream BSD-2-Clause
 license and attribution.

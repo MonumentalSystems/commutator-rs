@@ -25,6 +25,9 @@ is versioned independently; release headings include the crate name.
   `f32` coefficients retain the represented semantics.
 - Add optional checked CGA point-cloud and real-dual-sphere adapters to
   `clifford-mesh` while keeping its default build dependency-free.
+- Add checked compact-dual and direct CGA plane decomposition to
+  `clifford-geometry`, preserving representative orientation and correcting
+  the extracted renderer helper's closest-point sign.
 - Add checked, transactional harmonic-wave, tanh-interface, and physical-core
   vortex initializers to `clifford-field` without coupling them to experiment
   presets or timestep selection. Initializers never select or change boundary
