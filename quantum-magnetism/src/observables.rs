@@ -65,12 +65,12 @@ impl SpinModel {
     ) -> Result<f64> {
         ensure_site(self, site)?;
         let norm = self.validate_state("state", state)?;
-        let mut value = Complex64::ZERO;
+        let mut value = Complex64::new(0.0, 0.0);
         for (basis, amplitude) in state.iter().copied().enumerate() {
             let (target, coefficient) = spin_action(axis, basis, site);
             value += state[target].conj() * coefficient * amplitude;
         }
-        value = value / norm;
+        value /= norm;
         if value.im.abs() > 256.0 * f64::EPSILON * (1.0 + value.re.abs()) {
             return Err(MagnetismError::NumericalFailure(
                 "spin expectation was not real",
@@ -106,7 +106,7 @@ impl SpinModel {
         ensure_site(self, left)?;
         ensure_site(self, right)?;
         let norm = self.validate_state("state", state)?;
-        let mut value = Complex64::ZERO;
+        let mut value = Complex64::new(0.0, 0.0);
         for (basis, amplitude) in state.iter().copied().enumerate() {
             let (middle, right_coefficient) = spin_action(right_axis, basis, right);
             let (target, left_coefficient) = spin_action(left_axis, middle, left);
@@ -145,14 +145,14 @@ impl SpinModel {
             return Err(MagnetismError::NonFinite("site positions and wavevector"));
         }
 
-        let mut transformed = vec![Complex64::ZERO; self.hilbert_dimension()];
+        let mut transformed = vec![Complex64::new(0.0, 0.0); self.hilbert_dimension()];
         for (site, position) in positions.iter().enumerate() {
             let phase = position
                 .iter()
                 .zip(wavevector)
                 .map(|(position, wavevector)| position * wavevector)
-                .sum();
-            let phase = Complex64::cis(phase);
+                .sum::<f64>();
+            let phase = Complex64::new(phase.cos(), phase.sin());
             for (basis, amplitude) in state.iter().copied().enumerate() {
                 let (target, coefficient) = spin_action(axis, basis, site);
                 transformed[target] += phase * coefficient * amplitude;

@@ -84,7 +84,10 @@ impl NormalHamiltonian {
                 actual: entries.len(),
             });
         }
-        if let Some(index) = entries.iter().position(|entry| !entry.is_finite()) {
+        if let Some(index) = entries
+            .iter()
+            .position(|entry| !entry.re.is_finite() || !entry.im.is_finite())
+        {
             return Err(SuperconductivityError::NonFinite {
                 context: "normal Hamiltonian",
                 index,
@@ -123,7 +126,7 @@ impl NormalHamiltonian {
             return Err(SuperconductivityError::EmptyLattice);
         }
         let orbitals = site_count * 2;
-        let mut entries = vec![Complex64::ZERO; orbitals * orbitals];
+        let mut entries = vec![Complex64::new(0.0, 0.0); orbitals * orbitals];
         for (site, &energy) in site_energies.iter().enumerate() {
             if !energy.is_finite() {
                 return Err(SuperconductivityError::NonFinite {
@@ -152,7 +155,7 @@ impl NormalHamiltonian {
             if hopping.from == hopping.to {
                 return Err(SuperconductivityError::SelfHopping { site: hopping.from });
             }
-            if !hopping.amplitude.is_finite() {
+            if !hopping.amplitude.re.is_finite() || !hopping.amplitude.im.is_finite() {
                 return Err(SuperconductivityError::NonFinite {
                     context: "hoppings",
                     index,
@@ -222,7 +225,10 @@ impl OnsiteSWaveModel {
                 actual: gaps.len(),
             });
         }
-        if let Some(index) = gaps.iter().position(|gap| !gap.is_finite()) {
+        if let Some(index) = gaps
+            .iter()
+            .position(|gap| !gap.re.is_finite() || !gap.im.is_finite())
+        {
             return Err(SuperconductivityError::NonFinite {
                 context: "onsite pairing gaps",
                 index,
@@ -254,20 +260,20 @@ impl OnsiteSWaveModel {
     pub fn hamiltonian(&self) -> BdGMatrix {
         let orbitals = self.normal.orbital_count();
         let n = orbitals * 2;
-        let mut entries = vec![Complex64::ZERO; n * n];
+        let mut entries = vec![Complex64::new(0.0, 0.0); n * n];
 
         for row in 0..orbitals {
             for column in 0..orbitals {
                 let mut normal = self.normal.get(row, column);
                 if row == column {
-                    normal -= self.chemical_potential.into();
+                    normal -= Complex64::new(self.chemical_potential, 0.0);
                 }
                 entries[row * n + column] = normal;
                 entries[(row + orbitals) * n + column + orbitals] = -self.normal.get(column, row)
                     + if row == column {
                         self.chemical_potential.into()
                     } else {
-                        Complex64::ZERO
+                        Complex64::new(0.0, 0.0)
                     };
             }
         }

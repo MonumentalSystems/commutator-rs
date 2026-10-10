@@ -92,7 +92,7 @@ impl BdGMatrix {
         if state.len() != orbitals * 2 {
             return None;
         }
-        let mut result = vec![Complex64::ZERO; state.len()];
+        let mut result = vec![Complex64::new(0.0, 0.0); state.len()];
         for index in 0..orbitals {
             result[index] = state[index + orbitals].conj();
             result[index + orbitals] = state[index].conj();
@@ -102,9 +102,9 @@ impl BdGMatrix {
 
     pub(crate) fn multiply(&self, vector: &[Complex64]) -> Vec<Complex64> {
         let n = self.dimension();
-        let mut result = vec![Complex64::ZERO; n];
+        let mut result = vec![Complex64::new(0.0, 0.0); n];
         for (row, result_entry) in result.iter_mut().enumerate() {
-            let mut sum = Complex64::ZERO;
+            let mut sum = Complex64::new(0.0, 0.0);
             for (column, &vector_entry) in vector.iter().enumerate() {
                 sum += self.get(row, column) * vector_entry;
             }

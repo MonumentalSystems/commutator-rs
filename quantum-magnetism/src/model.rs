@@ -194,7 +194,10 @@ impl SpinModel {
                 actual: state.len(),
             });
         }
-        if !state.iter().all(|value| value.is_finite()) {
+        if !state
+            .iter()
+            .all(|value| value.re.is_finite() && value.im.is_finite())
+        {
             return Err(MagnetismError::NonFinite(name));
         }
         let norm: f64 = state.iter().map(|value| value.norm_sqr()).sum();
@@ -220,7 +223,7 @@ impl SpinModel {
                 actual: output.len(),
             });
         }
-        output.fill(Complex64::ZERO);
+        output.fill(Complex64::new(0.0, 0.0));
 
         for (basis, amplitude) in state.iter().copied().enumerate() {
             let mut diagonal = 0.0;
@@ -249,7 +252,10 @@ impl SpinModel {
             }
             output[basis] += amplitude * diagonal;
         }
-        if output.iter().all(|value| value.is_finite()) {
+        if output
+            .iter()
+            .all(|value| value.re.is_finite() && value.im.is_finite())
+        {
             Ok(())
         } else {
             Err(MagnetismError::NumericalFailure(
@@ -260,7 +266,7 @@ impl SpinModel {
 
     /// Allocate and return `H|state>`.
     pub fn applied(&self, state: &[Complex64]) -> Result<Vec<Complex64>> {
-        let mut output = vec![Complex64::ZERO; self.dimension];
+        let mut output = vec![Complex64::new(0.0, 0.0); self.dimension];
         self.apply(state, &mut output)?;
         Ok(output)
     }

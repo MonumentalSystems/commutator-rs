@@ -9,106 +9,12 @@
 #![warn(missing_docs)]
 
 use core::fmt;
-use core::ops::{Add, AddAssign, Mul, Neg, Sub};
+
+pub use num_complex::Complex64;
 
 const MAX_STATE_DIMENSION: usize = 1 << 20;
 const MAX_OCCUPATION: usize = 64;
 const NORMALIZATION_TOLERANCE: f64 = 1.0e-12;
-
-/// A compact double-precision complex number.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Complex64 {
-    /// Real component.
-    pub re: f64,
-    /// Imaginary component.
-    pub im: f64,
-}
-
-impl Complex64 {
-    /// The additive identity.
-    pub const ZERO: Self = Self { re: 0.0, im: 0.0 };
-
-    /// The multiplicative identity.
-    pub const ONE: Self = Self { re: 1.0, im: 0.0 };
-
-    /// Constructs a complex value.
-    #[must_use]
-    pub const fn new(re: f64, im: f64) -> Self {
-        Self { re, im }
-    }
-
-    /// Returns the complex conjugate.
-    #[must_use]
-    pub const fn conj(self) -> Self {
-        Self::new(self.re, -self.im)
-    }
-
-    /// Returns the squared magnitude.
-    #[must_use]
-    pub fn norm_sqr(self) -> f64 {
-        self.re.mul_add(self.re, self.im * self.im)
-    }
-
-    /// Returns `exp(i angle)`.
-    #[must_use]
-    pub fn cis(angle: f64) -> Self {
-        Self::new(angle.cos(), angle.sin())
-    }
-
-    fn is_finite(self) -> bool {
-        self.re.is_finite() && self.im.is_finite()
-    }
-}
-
-impl Add for Complex64 {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self::new(self.re + rhs.re, self.im + rhs.im)
-    }
-}
-
-impl AddAssign for Complex64 {
-    fn add_assign(&mut self, rhs: Self) {
-        self.re += rhs.re;
-        self.im += rhs.im;
-    }
-}
-
-impl Sub for Complex64 {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self::new(self.re - rhs.re, self.im - rhs.im)
-    }
-}
-
-impl Neg for Complex64 {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        Self::new(-self.re, -self.im)
-    }
-}
-
-impl Mul for Complex64 {
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        Self::new(
-            self.re.mul_add(rhs.re, -self.im * rhs.im),
-            self.re.mul_add(rhs.im, self.im * rhs.re),
-        )
-    }
-}
-
-impl Mul<f64> for Complex64 {
-    type Output = Self;
-
-    fn mul(self, rhs: f64) -> Self::Output {
-        Self::new(self.re * rhs, self.im * rhs)
-    }
-}
 
 /// Errors returned by checked quantum-light kernels.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -311,7 +217,10 @@ impl StateVector {
                 actual: amplitudes.len(),
             });
         }
-        if amplitudes.iter().any(|value| !value.is_finite()) {
+        if amplitudes
+            .iter()
+            .any(|value| !value.re.is_finite() || !value.im.is_finite())
+        {
             return Err(QuantumLightError::NonFiniteInput);
         }
         Ok(Self { space, amplitudes })
@@ -320,16 +229,16 @@ impl StateVector {
     /// Constructs one occupation-number basis state.
     pub fn basis(space: FockSpace, occupations: &[usize]) -> Result<Self> {
         let index = space.basis_index(occupations)?;
-        let mut amplitudes = vec![Complex64::ZERO; space.dimension];
-        amplitudes[index] = Complex64::ONE;
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0); space.dimension];
+        amplitudes[index] = Complex64::new(1.0, 0.0);
         Ok(Self { space, amplitudes })
     }
 
     /// Constructs the multimode vacuum.
     #[must_use]
     pub fn vacuum(space: FockSpace) -> Self {
-        let mut amplitudes = vec![Complex64::ZERO; space.dimension];
-        amplitudes[0] = Complex64::ONE;
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0); space.dimension];
+        amplitudes[0] = Complex64::new(1.0, 0.0);
         Self { space, amplitudes }
     }
 
@@ -347,7 +256,7 @@ impl StateVector {
         if lambda.abs() >= 1.0 {
             return Err(QuantumLightError::InvalidSqueezing);
         }
-        let mut amplitudes = vec![Complex64::ZERO; space.dimension];
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0); space.dimension];
         let mut occupations = vec![0; space.modes];
         let mut coefficient = 1.0;
         for occupation in 0..=space.max_occupation {
@@ -407,7 +316,7 @@ impl StateVector {
     /// Applies a bosonic annihilation operator to one mode.
     pub fn annihilate(&self, mode: usize) -> Result<Self> {
         self.space.check_mode(mode)?;
-        let mut output = vec![Complex64::ZERO; self.space.dimension];
+        let mut output = vec![Complex64::new(0.0, 0.0); self.space.dimension];
         for (index, &amplitude) in self.amplitudes.iter().enumerate() {
             let mut occupations = self.space.occupations(index)?;
             let occupation = occupations[mode];
@@ -432,7 +341,7 @@ impl StateVector {
                 maximum: self.space.max_occupation,
             });
         }
-        let mut output = vec![Complex64::ZERO; self.space.dimension];
+        let mut output = vec![Complex64::new(0.0, 0.0); self.space.dimension];
         for (index, &amplitude) in self.amplitudes.iter().enumerate() {
             let mut occupations = self.space.occupations(index)?;
             let occupation = occupations[mode];
@@ -467,7 +376,8 @@ impl StateVector {
         let mut output = self.clone();
         for (index, amplitude) in output.amplitudes.iter_mut().enumerate() {
             let occupation = self.space.occupations(index)?[mode];
-            *amplitude = *amplitude * Complex64::cis(phase * occupation as f64);
+            let angle = phase * occupation as f64;
+            *amplitude *= Complex64::new(angle.cos(), angle.sin());
         }
         Ok(output)
     }
@@ -498,7 +408,7 @@ impl StateVector {
 
         let cosine = theta.cos();
         let sine = theta.sin();
-        let mut output = vec![Complex64::ZERO; self.space.dimension];
+        let mut output = vec![Complex64::new(0.0, 0.0); self.space.dimension];
         for (index, &amplitude) in self.amplitudes.iter().enumerate() {
             if amplitude.norm_sqr() <= NORMALIZATION_TOLERANCE {
                 continue;
@@ -583,7 +493,7 @@ impl StateVector {
     pub fn density_matrix(&self) -> Result<DensityMatrix> {
         let normalized = self.normalized()?;
         let dimension = self.space.dimension;
-        let mut elements = vec![Complex64::ZERO; dimension * dimension];
+        let mut elements = vec![Complex64::new(0.0, 0.0); dimension * dimension];
         for row in 0..dimension {
             for column in 0..dimension {
                 elements[row * dimension + column] =
@@ -648,7 +558,7 @@ impl DensityMatrix {
     pub fn reduced_mode(&self, mode: usize) -> Result<ReducedDensityMatrix> {
         self.space.check_mode(mode)?;
         let local_dimension = self.space.max_occupation + 1;
-        let mut elements = vec![Complex64::ZERO; local_dimension * local_dimension];
+        let mut elements = vec![Complex64::new(0.0, 0.0); local_dimension * local_dimension];
         for row in 0..self.dimension {
             let mut occupations = self.space.occupations(row)?;
             let local_row = occupations[mode];
@@ -867,9 +777,11 @@ mod tests {
             StateVector::try_from_amplitudes(space, vec![]),
             Err(QuantumLightError::AmplitudeShape { .. })
         ));
-        let zero =
-            StateVector::try_from_amplitudes(space, vec![Complex64::ZERO; space.dimension()])
-                .unwrap();
+        let zero = StateVector::try_from_amplitudes(
+            space,
+            vec![Complex64::new(0.0, 0.0); space.dimension()],
+        )
+        .unwrap();
         assert_eq!(zero.normalized(), Err(QuantumLightError::ZeroNorm));
         assert_eq!(
             StateVector::two_mode_squeezed(space, 0, 1, 1.0),

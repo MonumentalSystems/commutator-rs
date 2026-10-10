@@ -21,3 +21,4 @@ include = [
 ]
 
 [dependencies]
+num-complex = "0.4.6"

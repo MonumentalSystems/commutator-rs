@@ -10,7 +10,8 @@ pairing amplitudes.
 The crate intentionally does not select a dense or sparse eigensolver. This
 keeps its numerical model interoperable with existing Rust linear-algebra
 ecosystems and lets callers choose a backend appropriate to their lattice.
-It has no dependencies and supports Rust 1.80.
+It depends only on `num-complex` for an interoperable scalar and supports
+Rust 1.80.
 
 ```rust
 use superconductivity::{Complex64, NormalHamiltonian, OnsiteSWaveModel};

@@ -68,7 +68,7 @@ fn deterministic_start(length: usize, mut state: u64) -> Vec<Complex64> {
         vector.push(Complex64::new(real, imaginary));
     }
     let norm = vector_norm(&vector);
-    vector.iter_mut().for_each(|value| *value = *value / norm);
+    vector.iter_mut().for_each(|value| *value /= norm);
     vector
 }
 
@@ -232,13 +232,12 @@ impl SpinModel {
                 break;
             }
             off_diagonal.push(tail_beta);
-            work.iter_mut()
-                .for_each(|value| *value = *value / tail_beta);
+            work.iter_mut().for_each(|value| *value /= tail_beta);
             basis.push(work);
         }
 
         let (energy, coefficients) = smallest_symmetric_eigenpair(&diagonal, &off_diagonal)?;
-        let mut state = vec![Complex64::ZERO; self.hilbert_dimension()];
+        let mut state = vec![Complex64::new(0.0, 0.0); self.hilbert_dimension()];
         for (coefficient, vector) in coefficients.iter().zip(&basis) {
             for (state, basis_value) in state.iter_mut().zip(vector) {
                 *state += *basis_value * *coefficient;
@@ -250,7 +249,7 @@ impl SpinModel {
                 "Ritz vector had invalid norm",
             ));
         }
-        state.iter_mut().for_each(|value| *value = *value / norm);
+        state.iter_mut().for_each(|value| *value /= norm);
         let residual_norm = tail_beta * coefficients.last().copied().unwrap_or(0.0).abs();
         Ok(GroundState {
             energy,
