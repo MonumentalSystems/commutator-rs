@@ -23,4 +23,8 @@ is versioned independently; release headings include the crate name.
 - Add checked CGA point and real dual-sphere decomposition to
   `clifford-geometry`, including homogeneous normalization when the scaled
   `f32` coefficients retain the represented semantics.
+- Add checked, transactional harmonic-wave, tanh-interface, and physical-core
+  vortex initializers to `clifford-field` without coupling them to experiment
+  presets or timestep selection. Initializers never select or change boundary
+  policy; the lone-vortex initializer rejects periodic topology.
 
