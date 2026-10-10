@@ -1,0 +1,23 @@
+[package]
+name = "spin-lattice"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Checked reference kernels for coupled classical spins and harmonic lattices"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/spin-lattice"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["magnetism", "spin-lattice", "magnetoelastic", "simulation"]
+categories = ["science", "simulation"]
+include = [
+    "src/**/*.rs",
+    "tests/**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
+
+[dependencies]
