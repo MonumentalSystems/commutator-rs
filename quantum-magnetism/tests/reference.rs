@@ -11,6 +11,13 @@ fn singlet() -> Vec<Complex64> {
     ]
 }
 
+fn assert_complex_close(actual: Complex64, expected: Complex64) {
+    assert!(
+        (actual - expected).norm() < 1.0e-14,
+        "actual={actual:?}, expected={expected:?}"
+    );
+}
+
 #[test]
 fn heisenberg_dimer_has_analytic_singlet_energy() {
     let model = SpinModel::builder(2)
@@ -62,6 +69,99 @@ fn longitudinal_field_uses_minus_h_sz_convention() {
     let up = [Complex64::ZERO, Complex64::ONE];
     assert!((model.energy(&down).unwrap() - 1.0).abs() < 1.0e-14);
     assert!((model.energy(&up).unwrap() + 1.0).abs() < 1.0e-14);
+}
+
+#[test]
+fn spin_y_matches_bit_zero_down_bit_one_up_convention() {
+    let model = SpinModel::builder(1).build().unwrap();
+    let plus_y = [
+        Complex64::new(0.0, FRAC_1_SQRT_2),
+        Complex64::from(FRAC_1_SQRT_2),
+    ];
+    let minus_y = [
+        Complex64::new(0.0, -FRAC_1_SQRT_2),
+        Complex64::from(FRAC_1_SQRT_2),
+    ];
+    assert!((model.local_magnetization(&plus_y, 0, SpinAxis::Y).unwrap() - 0.5).abs() < 1.0e-14);
+    assert!((model.local_magnetization(&minus_y, 0, SpinAxis::Y).unwrap() + 0.5).abs() < 1.0e-14);
+}
+
+#[test]
+fn dm_axes_match_d_dot_si_cross_sj_matrix_elements() {
+    let zero = Complex64::ZERO;
+    let x_expected = [
+        zero,
+        Complex64::new(0.0, -0.25),
+        Complex64::new(0.0, 0.25),
+        zero,
+        Complex64::new(0.0, 0.25),
+        zero,
+        zero,
+        Complex64::new(0.0, -0.25),
+        Complex64::new(0.0, -0.25),
+        zero,
+        zero,
+        Complex64::new(0.0, 0.25),
+        zero,
+        Complex64::new(0.0, 0.25),
+        Complex64::new(0.0, -0.25),
+        zero,
+    ];
+    let y_expected = [
+        zero,
+        0.25.into(),
+        (-0.25).into(),
+        zero,
+        0.25.into(),
+        zero,
+        zero,
+        0.25.into(),
+        (-0.25).into(),
+        zero,
+        zero,
+        (-0.25).into(),
+        zero,
+        0.25.into(),
+        (-0.25).into(),
+        zero,
+    ];
+    let z_expected = [
+        zero,
+        zero,
+        zero,
+        zero,
+        zero,
+        zero,
+        Complex64::new(0.0, 0.5),
+        zero,
+        zero,
+        Complex64::new(0.0, -0.5),
+        zero,
+        zero,
+        zero,
+        zero,
+        zero,
+        zero,
+    ];
+
+    for (dm, expected) in [
+        ([1.0, 0.0, 0.0], x_expected),
+        ([0.0, 1.0, 0.0], y_expected),
+        ([0.0, 0.0, 1.0], z_expected),
+    ] {
+        let model = SpinModel::builder(2)
+            .bond(Bond::xyz(0, 1, 0.0, 0.0, 0.0).with_dm(dm))
+            .build()
+            .unwrap();
+        for source in 0..4 {
+            let mut basis = vec![zero; 4];
+            basis[source] = Complex64::ONE;
+            let applied = model.applied(&basis).unwrap();
+            for target in 0..4 {
+                assert_complex_close(applied[target], expected[target * 4 + source]);
+            }
+        }
+    }
 }
 
 #[test]

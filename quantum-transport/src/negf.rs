@@ -17,6 +17,10 @@ pub struct TransmissionPoint {
     pub transmission: f64,
 }
 
+fn component_max(value: Complex64) -> f64 {
+    value.re.abs().max(value.im.abs())
+}
+
 fn validate_tolerance(tolerance: f64) -> Result<()> {
     if tolerance.is_finite() && tolerance > 0.0 {
         Ok(())
@@ -58,7 +62,7 @@ fn psd_minimum_pivot(matrix: &DenseMatrix, tolerance: f64) -> Result<f64> {
     let scale = matrix
         .as_slice()
         .iter()
-        .fold(1.0_f64, |scale, value| scale.max(value.norm()));
+        .fold(0.0_f64, |scale, value| scale.max(component_max(*value)));
     let threshold = tolerance * scale;
     let mut lower = vec![Complex64::new(0.0, 0.0); size * size];
     let mut diagonal = vec![0.0; size];
@@ -84,7 +88,7 @@ fn psd_minimum_pivot(matrix: &DenseMatrix, tolerance: f64) -> Result<f64> {
                     .map(|k| lower[row * size + k] * lower[column * size + k].conj() * diagonal[k])
                     .sum();
                 let residual = matrix.get(row, column).expect("checked dimensions") - correction;
-                if residual.norm() > threshold {
+                if component_max(residual) > threshold {
                     return Ok(minimum.min(-2.0 * threshold));
                 }
             }
@@ -143,7 +147,7 @@ pub fn broadening(self_energy: &DenseMatrix, tolerance: f64) -> Result<DenseMatr
     let scale = gamma
         .as_slice()
         .iter()
-        .fold(1.0_f64, |scale, value| scale.max(value.norm()));
+        .fold(0.0_f64, |scale, value| scale.max(component_max(*value)));
     if minimum < -tolerance * scale {
         Err(TransportError::NonCausalSelfEnergy {
             minimum_pivot: minimum,
@@ -202,7 +206,7 @@ pub fn caroli_transmission(
         let scale = gamma
             .as_slice()
             .iter()
-            .fold(1.0_f64, |scale, value| scale.max(value.norm()));
+            .fold(0.0_f64, |scale, value| scale.max(component_max(*value)));
         if minimum < -tolerance * scale {
             return Err(TransportError::NonCausalSelfEnergy {
                 minimum_pivot: minimum,

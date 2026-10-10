@@ -30,7 +30,8 @@ assert!((ground.energy + 0.75).abs() < 1.0e-10);
 ## Conventions
 
 Basis index bit `i = 1` denotes spin-up at site `i`; bit `0` denotes
-spin-down. Spin operators are `S = sigma/2`. An oriented bond `(i, j)` adds
+spin-down. Spin operators are `S = sigma/2`; in this down/up storage order,
+`Sy|down> = -i|up>/2` and `Sy|up> = i|down>/2`. An oriented bond `(i, j)` adds
 
 `Jx Sx_i Sx_j + Jy Sy_i Sy_j + Jz Sz_i Sz_j + D · (S_i × S_j)`.
 

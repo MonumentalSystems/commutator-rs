@@ -5,6 +5,10 @@ use crate::{Complex64, DenseMatrix, GreenError, Result};
 
 const DEFAULT_CAUSALITY_TOLERANCE: f64 = 1.0e-12;
 
+fn component_max(value: Complex64) -> f64 {
+    value.re.abs().max(value.im.abs())
+}
+
 /// One retarded frequency and its cluster Green-function matrix.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GreenPoint {
@@ -231,12 +235,6 @@ fn matrix_causality(green: &DenseMatrix, tolerance: f64) -> Result<CausalityRepo
     validate_tolerance(tolerance)?;
     green.require_square("causality matrix")?;
     let size = green.rows();
-    let scale = green
-        .as_slice()
-        .iter()
-        .fold(1.0_f64, |scale, value| scale.max(value.norm()));
-    let threshold = tolerance * scale;
-
     // Spectral numerator A = (G† - G)/(2i) = -Im_H G.
     let mut spectral = vec![Complex64::new(0.0, 0.0); size * size];
     for row in 0..size {
@@ -246,6 +244,10 @@ fn matrix_causality(green: &DenseMatrix, tolerance: f64) -> Result<CausalityRepo
             spectral[row * size + column] = (g_dagger - g) / Complex64::new(0.0, 2.0);
         }
     }
+    let spectral_scale = spectral
+        .iter()
+        .fold(0.0_f64, |scale, value| scale.max(component_max(*value)));
+    let threshold = tolerance * spectral_scale;
 
     // Unpivoted LDL† is sufficient for positive semidefinite Hermitian A.
     // A zero pivot must have a zero residual column; otherwise A is not PSD.
@@ -277,7 +279,7 @@ fn matrix_causality(green: &DenseMatrix, tolerance: f64) -> Result<CausalityRepo
                 let correction: Complex64 = (0..column)
                     .map(|k| lower[row * size + k] * lower[column * size + k].conj() * diagonal[k])
                     .sum();
-                if (spectral[row * size + column] - correction).norm() > threshold {
+                if component_max(spectral[row * size + column] - correction) > threshold {
                     return Ok(CausalityReport {
                         causal: false,
                         minimum_pivot: minimum_pivot.min(-threshold),

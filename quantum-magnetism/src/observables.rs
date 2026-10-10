@@ -24,7 +24,7 @@ fn spin_action(axis: SpinAxis, basis: usize, site: usize) -> (usize, Complex64) 
         SpinAxis::X => (basis ^ (1usize << site), Complex64::from(0.5)),
         SpinAxis::Y => (
             basis ^ (1usize << site),
-            Complex64::new(0.0, -0.5 * spin_sign(basis, site)),
+            Complex64::new(0.0, 0.5 * spin_sign(basis, site)),
         ),
         SpinAxis::Z => (basis, Complex64::from(0.5 * spin_sign(basis, site))),
     }

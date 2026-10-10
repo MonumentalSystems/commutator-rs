@@ -1,5 +1,9 @@
 use crate::{Complex64, GreenError, Result};
 
+fn component_max(value: Complex64) -> f64 {
+    value.re.abs().max(value.im.abs())
+}
+
 /// A small row-major dense complex matrix.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DenseMatrix {
@@ -150,13 +154,13 @@ impl DenseMatrix {
         let scale = self
             .values
             .iter()
-            .fold(1.0_f64, |scale, value| scale.max(value.norm()));
+            .fold(0.0_f64, |scale, value| scale.max(component_max(*value)));
         let threshold = tolerance * scale;
         for row in 0..self.rows {
             for column in row..self.columns {
                 let difference = self.values[row * self.columns + column]
                     - self.values[column * self.columns + row].conj();
-                if difference.norm() > threshold {
+                if component_max(difference) > threshold {
                     return Ok(false);
                 }
             }
@@ -168,18 +172,22 @@ impl DenseMatrix {
     pub fn inverse(&self) -> Result<Self> {
         self.require_square("matrix inverse")?;
         let size = self.rows;
-        let mut left = self.values.clone();
-        let mut right = Self::identity(size)?.values;
-        let scale = left
+        let scale = self
+            .values
             .iter()
-            .fold(0.0_f64, |scale, value| scale.max(value.norm()));
-        let threshold = 64.0 * f64::EPSILON * scale.max(1.0) * size as f64;
+            .fold(0.0_f64, |scale, value| scale.max(component_max(*value)));
+        if scale == 0.0 {
+            return Err(GreenError::SingularMatrix { pivot: 0 });
+        }
+        let mut left: Vec<_> = self.values.iter().map(|value| *value / scale).collect();
+        let mut right = Self::identity(size)?.values;
+        let threshold = 64.0 * f64::EPSILON * size as f64;
 
         for pivot in 0..size {
             let mut pivot_row = pivot;
-            let mut pivot_norm = left[pivot * size + pivot].norm();
+            let mut pivot_norm = component_max(left[pivot * size + pivot]);
             for row in pivot + 1..size {
-                let candidate = left[row * size + pivot].norm();
+                let candidate = component_max(left[row * size + pivot]);
                 if candidate > pivot_norm {
                     pivot_norm = candidate;
                     pivot_row = row;
@@ -215,6 +223,7 @@ impl DenseMatrix {
                 }
             }
         }
+        right.iter_mut().for_each(|value| *value /= scale);
         Self::try_new(size, size, right)
     }
 
