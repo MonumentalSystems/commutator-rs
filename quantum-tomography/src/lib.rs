@@ -901,7 +901,7 @@ pub fn reconstruct_gate_set(
     let mut objective =
         penalized_objective(final_fit, &coordinates, &anchor, config.anchor_strength);
     let mut accepted_iterations = 0usize;
-    let mut termination = GstTermination::MaximumIterations;
+    let mut termination = None;
 
     for _ in 0..config.max_iterations {
         let gradient = finite_difference_gradient(
@@ -919,7 +919,7 @@ pub fn reconstruct_gate_set(
             .sum::<f64>()
             .sqrt();
         if gradient_norm <= config.gradient_tolerance {
-            termination = GstTermination::GradientTolerance;
+            termination = Some(GstTermination::GradientTolerance);
             break;
         }
 
@@ -942,7 +942,7 @@ pub fn reconstruct_gate_set(
             step *= 0.5;
         }
         let Some((trial, (trial_objective, trial_fit, trial_model))) = accepted else {
-            termination = GstTermination::LineSearchStalled;
+            termination = Some(GstTermination::LineSearchStalled);
             break;
         };
         let improvement = objective - trial_objective;
@@ -952,14 +952,12 @@ pub fn reconstruct_gate_set(
         model = trial_model;
         accepted_iterations += 1;
         if improvement <= config.objective_tolerance {
-            termination = GstTermination::ObjectiveTolerance;
+            termination = Some(GstTermination::ObjectiveTolerance);
             break;
         }
     }
 
-    if accepted_iterations == config.max_iterations {
-        termination = GstTermination::MaximumIterations;
-    }
+    let mut termination = termination.unwrap_or(GstTermination::MaximumIterations);
     let final_gradient = finite_difference_gradient(
         initial,
         records,
@@ -974,6 +972,11 @@ pub fn reconstruct_gate_set(
         .map(|value| value * value)
         .sum::<f64>()
         .sqrt();
+    if termination == GstTermination::MaximumIterations
+        && gradient_norm <= config.gradient_tolerance
+    {
+        termination = GstTermination::GradientTolerance;
+    }
     Ok(GstReconstruction {
         model,
         initial: initial_fit,

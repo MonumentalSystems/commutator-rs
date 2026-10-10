@@ -307,5 +307,75 @@ fn gst_reconstruction_checks_chart_and_reports_iteration_limit() {
     )
     .unwrap();
     assert_eq!(result.termination(), GstTermination::MaximumIterations);
+    assert!(!result.converged());
     assert_eq!(result.iterations(), 1);
+}
+
+#[test]
+fn gst_final_allowed_step_preserves_objective_convergence() {
+    let model = GateSetModel::try_new(
+        vec![1.0, 0.2],
+        vec![vec![0.5, 0.5], vec![0.5, -0.5]],
+        vec![("g".into(), vec![1.0, 0.0, 0.0, 0.5])],
+    )
+    .unwrap();
+    let records = [GstRecord {
+        sequence: vec!["g".into()],
+        counts: vec![60, 40],
+    }];
+    let result = reconstruct_gate_set(
+        &model,
+        &records,
+        &[GstParameter::Gate {
+            name: "g".into(),
+            row: 1,
+            column: 1,
+        }],
+        GstOptimizerConfig {
+            max_iterations: 1,
+            objective_tolerance: 1.0e30,
+            ..GstOptimizerConfig::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.iterations(), 1);
+    assert_eq!(result.termination(), GstTermination::ObjectiveTolerance);
+    assert!(result.converged());
+    assert!(result.final_fit().log_likelihood > result.initial_fit().log_likelihood);
+}
+
+#[test]
+fn gst_final_allowed_step_reports_final_gradient_convergence() {
+    let model = GateSetModel::try_new(
+        vec![1.0, 0.2],
+        vec![vec![0.5, 0.5], vec![0.5, -0.5]],
+        vec![("g".into(), vec![1.0, 0.0, 0.0, 0.5])],
+    )
+    .unwrap();
+    let records = [GstRecord {
+        sequence: vec!["g".into()],
+        counts: vec![60, 40],
+    }];
+    let result = reconstruct_gate_set(
+        &model,
+        &records,
+        &[GstParameter::Gate {
+            name: "g".into(),
+            row: 1,
+            column: 1,
+        }],
+        GstOptimizerConfig {
+            max_iterations: 1,
+            gradient_tolerance: 1.5,
+            objective_tolerance: 1.0e-30,
+            ..GstOptimizerConfig::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(result.iterations(), 1);
+    assert_eq!(result.termination(), GstTermination::GradientTolerance);
+    assert!(result.converged());
+    assert!(result.gradient_norm() <= 1.5);
 }
