@@ -1,0 +1,22 @@
+[package]
+name = "field-lyapunov"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Matrix-free Lyapunov diagnostics for high-dimensional fields and dynamical systems"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/field-lyapunov"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["lyapunov", "chaos", "dynamical-systems", "pde", "matrix-free"]
+categories = ["mathematics", "science", "simulation"]
+include = [
+    "src/**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
+
+[dependencies]
