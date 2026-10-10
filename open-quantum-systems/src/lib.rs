@@ -90,6 +90,15 @@ fn component_norm(value: Complex64) -> f64 {
     value.re.abs().max(value.im.abs())
 }
 
+fn zeroed_operator_values(length: usize) -> Result<Vec<Complex64>> {
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(length)
+        .map_err(|_| QuantumError::InvalidDimension)?;
+    values.resize(length, Complex64::new(0.0, 0.0));
+    Ok(values)
+}
+
 /// A checked square row-major complex operator.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Operator {
@@ -129,7 +138,7 @@ impl Operator {
         if dimension == 0 {
             return Err(QuantumError::InvalidDimension);
         }
-        let mut values = vec![Complex64::new(0.0, 0.0); length];
+        let mut values = zeroed_operator_values(length)?;
         for index in 0..dimension {
             values[index * dimension + index] = Complex64::new(1.0, 0.0);
         }
@@ -324,7 +333,7 @@ impl DensityMatrix {
         let length = dimension
             .checked_mul(dimension)
             .ok_or(QuantumError::InvalidDimension)?;
-        let mut values = vec![Complex64::new(0.0, 0.0); length];
+        let mut values = zeroed_operator_values(length)?;
         values[index * dimension + index] = Complex64::new(1.0, 0.0);
         Self::try_new(Operator::try_new(dimension, values)?, 64.0 * f64::EPSILON)
     }
@@ -651,6 +660,22 @@ mod tests {
     fn maximally_mixed_purity_is_inverse_dimension() {
         let state = DensityMatrix::maximally_mixed(4).unwrap();
         assert!((state.purity().unwrap() - 0.25).abs() < 1e-15);
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn enormous_zero_initialized_operators_return_errors_without_panicking() {
+        let dimension = 1usize << 30;
+        let identity = std::panic::catch_unwind(|| Operator::identity(dimension));
+        assert!(
+            identity.is_ok(),
+            "checked identity construction must not panic"
+        );
+        assert_eq!(identity.unwrap(), Err(QuantumError::InvalidDimension));
+
+        let basis = std::panic::catch_unwind(|| DensityMatrix::basis(dimension, 0));
+        assert!(basis.is_ok(), "checked basis construction must not panic");
+        assert_eq!(basis.unwrap(), Err(QuantumError::InvalidDimension));
     }
 
     #[test]

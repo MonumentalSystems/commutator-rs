@@ -2,11 +2,12 @@ use crate::{Complex64, DenseMatrix, KeldyshError, Result};
 
 pub(crate) fn zero(size: usize) -> Result<DenseMatrix> {
     let length = size.checked_mul(size).ok_or(KeldyshError::SizeOverflow)?;
-    Ok(DenseMatrix::try_new(
-        size,
-        size,
-        vec![Complex64::new(0.0, 0.0); length],
-    )?)
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(length)
+        .map_err(|_| KeldyshError::SizeOverflow)?;
+    values.resize(length, Complex64::new(0.0, 0.0));
+    Ok(DenseMatrix::try_new(size, size, values)?)
 }
 
 pub(crate) fn validate_square(matrix: &DenseMatrix, size: usize, name: &'static str) -> Result<()> {

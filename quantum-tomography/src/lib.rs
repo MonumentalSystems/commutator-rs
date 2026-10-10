@@ -85,7 +85,10 @@ impl LocalPauliPlan {
         let count = 3usize
             .checked_pow(qubits as u32)
             .ok_or(TomographyError::InvalidQubits)?;
-        let mut settings = Vec::with_capacity(count);
+        let mut settings = Vec::new();
+        settings
+            .try_reserve_exact(count)
+            .map_err(|_| TomographyError::InvalidQubits)?;
         for mut code in 0..count {
             let mut s = vec![Pauli::X; qubits];
             for q in (0..qubits).rev() {

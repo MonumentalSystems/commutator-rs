@@ -16,6 +16,19 @@ where
         .expect("valid function")
 }
 
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn enormous_two_time_shape_returns_error_without_panicking() {
+    let result = std::panic::catch_unwind(|| {
+        TwoTimeMatrix::try_from_fn(1usize << 31, 1, |_, _| Ok(scalar(0.0.into())))
+    });
+    assert!(
+        result.is_ok(),
+        "checked two-time construction must not panic"
+    );
+    assert_eq!(result.unwrap(), Err(KeldyshError::SizeOverflow));
+}
+
 fn equilibrium_level(grid: RealTimeGrid, energy: f64, occupation: f64) -> KeldyshGreen {
     let points = grid.len();
     let phase = |i: usize, j: usize| {

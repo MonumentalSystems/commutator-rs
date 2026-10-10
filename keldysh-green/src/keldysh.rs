@@ -43,10 +43,19 @@ impl TwoTimeMatrix {
     where
         F: FnMut(usize, usize) -> Result<DenseMatrix>,
     {
+        if time_points < 2 {
+            return Err(KeldyshError::Empty("two-time grid"));
+        }
+        if orbitals == 0 {
+            return Err(KeldyshError::Empty("orbital space"));
+        }
         let length = time_points
             .checked_mul(time_points)
             .ok_or(KeldyshError::SizeOverflow)?;
-        let mut values = Vec::with_capacity(length);
+        let mut values = Vec::new();
+        values
+            .try_reserve_exact(length)
+            .map_err(|_| KeldyshError::SizeOverflow)?;
         for first in 0..time_points {
             for second in 0..time_points {
                 values.push(function(first, second)?);

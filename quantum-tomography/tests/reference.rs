@@ -10,6 +10,14 @@ fn plan_and_zero() {
     close(r.get(0, 0).unwrap(), 1.0.into());
     close(r.get(1, 1).unwrap(), 0.0.into());
 }
+
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn enormous_measurement_plan_returns_error_without_panicking() {
+    let result = std::panic::catch_unwind(|| LocalPauliPlan::complete(40));
+    assert!(result.is_ok(), "checked construction must not panic");
+    assert_eq!(result.unwrap(), Err(TomographyError::InvalidQubits));
+}
 #[test]
 fn bell_state() {
     let e = [
