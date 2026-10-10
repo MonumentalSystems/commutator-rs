@@ -65,9 +65,13 @@ independent scientific recomputation.
 backend descriptors, deterministic partition plans, and differential
 qualification reports that compare an optimized implementation with a
 portable reference. Reports bind work content, worker identity, backend IDs,
-implementation versions, precision, and tolerances. The crate contains no
-hardware API or network transport and does not turn an untrusted serialized
-report into an admission token.
+implementation versions, precision, and a versioned policy with explicit
+absolute and relative tolerances. Opaque reports authorize only the exact work,
+worker, backend descriptor, and current policy checked in-process. Separate
+serialize-only audit snapshots expose full descriptor, worker, work, policy,
+and comparison evidence without providing a path back to admission authority.
+The crate contains no hardware API or network transport and does not turn
+untrusted serialized evidence into an admission token.
 
 ## Lattice layer
 

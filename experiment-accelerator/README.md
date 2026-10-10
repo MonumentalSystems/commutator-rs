@@ -17,8 +17,10 @@ transport. Hardware crates implement `ComputeBackend` and use the same
 validation harness in their own CI or startup qualification.
 Accepted qualification reports are constructible only by the differential
 check API and are bound to the serialized work unit, worker identity, backend
-IDs, and implementation versions. They serialize for audit logs but cannot be
-deserialized into an admission token from an untrusted worker.
+descriptors, and an explicit versioned policy with absolute and relative error
+limits. Reports remain opaque in-process admission capabilities. A separate
+serialize-only audit snapshot records the full evidence for logs but cannot be
+deserialized or used as an admission token.
 
 ```rust
 use experiment_accelerator::{partition_range, BackendDescriptor, BackendKind, Precision,
@@ -41,12 +43,16 @@ assert_eq!(partition_range(10, 4)?.len(), 3);
 
 This adapter validates integration and numerical agreement; it does not imply
 that a backend is deterministic merely because it runs on a GPU. Backends must
-declare that property honestly and publish differential tolerances appropriate
-to their precision and reduction order.
+declare that property honestly. Hosts supply a checked `QualificationPolicy`
+with a stable identity, version, and finite nonnegative absolute and relative
+tolerances appropriate to the backend precision and reduction order. Both
+numeric limits and the comparator's scientific-invariant decision must pass.
 
 Qualification reports are opaque in-process capabilities, not portable trust
-certificates. They cannot be deserialized. A distributed host that persists or
-transmits qualification must wrap the report in its own authenticated record
-and recreate authorization from a trusted reference allowlist after restart.
+certificates. They cannot be serialized or deserialized. `audit_snapshot()`
+produces the serialize-only evidence record; a distributed host should sign or
+authenticate those bytes when persisting or transmitting them and must recreate
+authorization from a trusted reference allowlist after restart. Audit evidence
+cannot recreate an admission capability.
 Work binding uses domain-separated SHA-256 over recursively key-sorted canonical
 JSON; payload types therefore need stable Serde value semantics.

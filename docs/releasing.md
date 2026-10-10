@@ -98,8 +98,10 @@ release page. The bundle should contain:
 - one SHA-256 digest for every `target/package/*.crate` archive;
 - the two checked scientific-fixture checksum files;
 - the test, Clippy, rustdoc, MSRV, and package job conclusions;
-- backend qualification reports, including precision and tolerances, for any
-  separately released accelerated implementation;
+- authenticated serialize-only backend qualification audit snapshots,
+  including descriptor digests, precision, versioned policy identity, and
+  absolute and relative tolerances, for any separately released accelerated
+  implementation;
 - links or immutable identifiers for associated papers, datasets, model
   weights, and reproduction inputs when they exist.
 

@@ -379,8 +379,13 @@ impl ReferenceAuthorization {
 pub enum ExecutionAuthorization<'a> {
     /// Host authorization for a portable reference implementation.
     Reference(&'a ReferenceAuthorization),
-    /// Accepted differential qualification for an optimized implementation.
-    Differential(&'a DifferentialReport),
+    /// Accepted differential qualification under the host's current policy.
+    Differential {
+        /// Opaque in-process qualification capability.
+        report: &'a DifferentialReport,
+        /// Exact checked policy that the host currently requires.
+        policy: &'a QualificationPolicy,
+    },
 }
 
 /// Failure returned by [`execute_work_unit`].
@@ -420,8 +425,8 @@ where
     }
     let authorized = match authorization {
         ExecutionAuthorization::Reference(reference) => reference.authorizes(backend.descriptor()),
-        ExecutionAuthorization::Differential(report) => {
-            report.qualifies(backend.descriptor(), worker, work)
+        ExecutionAuthorization::Differential { report, policy } => {
+            report.qualifies(backend.descriptor(), worker, work, policy)
         }
     };
     if !authorized {
@@ -556,6 +561,107 @@ impl Comparison {
     }
 }
 
+/// Versioned numerical admission policy for differential qualification.
+///
+/// Both maximum-error limits are enforced as upper bounds. A comparator may
+/// additionally reject a result through [`Comparison::accepted`] when a
+/// scientific invariant fails.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct QualificationPolicy {
+    id: String,
+    version: String,
+    absolute_tolerance: f64,
+    relative_tolerance: f64,
+}
+
+impl QualificationPolicy {
+    /// Constructs a checked, versioned policy with finite nonnegative limits.
+    pub fn try_new(
+        id: impl Into<String>,
+        version: impl Into<String>,
+        absolute_tolerance: f64,
+        relative_tolerance: f64,
+    ) -> Result<Self, AdapterError> {
+        let id = id.into();
+        let version = version.into();
+        if id.trim().is_empty() {
+            return Err(AdapterError::EmptyIdentifier("qualification policy id"));
+        }
+        if version.trim().is_empty() {
+            return Err(AdapterError::EmptyIdentifier(
+                "qualification policy version",
+            ));
+        }
+        if !absolute_tolerance.is_finite()
+            || absolute_tolerance < 0.0
+            || !relative_tolerance.is_finite()
+            || relative_tolerance < 0.0
+        {
+            return Err(AdapterError::InvalidTolerance);
+        }
+        Ok(Self {
+            id,
+            version,
+            absolute_tolerance,
+            relative_tolerance,
+        })
+    }
+
+    /// Returns the stable policy identifier.
+    #[must_use]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// Returns the policy implementation or configuration version.
+    #[must_use]
+    pub fn version(&self) -> &str {
+        &self.version
+    }
+
+    /// Returns the maximum admitted absolute error.
+    #[must_use]
+    pub const fn absolute_tolerance(&self) -> f64 {
+        self.absolute_tolerance
+    }
+
+    /// Returns the maximum admitted relative error.
+    #[must_use]
+    pub const fn relative_tolerance(&self) -> f64 {
+        self.relative_tolerance
+    }
+
+    fn accepts(&self, comparison: &Comparison) -> bool {
+        comparison.accepted
+            && comparison.max_absolute_error <= self.absolute_tolerance
+            && comparison.max_relative_error <= self.relative_tolerance
+    }
+}
+
+#[derive(Deserialize)]
+struct RawQualificationPolicy {
+    id: String,
+    version: String,
+    absolute_tolerance: f64,
+    relative_tolerance: f64,
+}
+
+impl<'de> Deserialize<'de> for QualificationPolicy {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw = RawQualificationPolicy::deserialize(deserializer)?;
+        Self::try_new(
+            raw.id,
+            raw.version,
+            raw.absolute_tolerance,
+            raw.relative_tolerance,
+        )
+        .map_err(serde::de::Error::custom)
+    }
+}
+
 /// Scientific result comparison policy used by differential validation.
 pub trait ResultComparator<R> {
     /// Compares a candidate result to the reference result.
@@ -566,10 +672,18 @@ pub trait ResultComparator<R> {
 ///
 /// Reports intentionally implement neither serialization nor deserialization:
 /// safe code can obtain an admission capability only from [`differential_check`].
+/// Use [`Self::audit_snapshot`] for serialize-only provenance evidence.
 ///
 /// ```compile_fail
 /// use experiment_accelerator::DifferentialReport;
 /// let _: DifferentialReport = serde_json::from_str("{}").unwrap();
+/// ```
+///
+/// ```compile_fail
+/// use experiment_accelerator::DifferentialReport;
+/// # fn opaque(report: &DifferentialReport) {
+/// let _ = serde_json::to_string(report).unwrap();
+/// # }
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 pub struct DifferentialReport {
@@ -577,6 +691,8 @@ pub struct DifferentialReport {
     reference_backend: String,
     /// Reference implementation version.
     reference_version: String,
+    /// Canonical digest of the complete reference descriptor.
+    reference_descriptor_sha256: [u8; 32],
     /// Candidate backend identifier.
     candidate_backend: String,
     /// Candidate implementation version.
@@ -601,6 +717,10 @@ pub struct DifferentialReport {
     work_sha256: [u8; 32],
     /// Shared deterministic seed.
     seed: u64,
+    /// Checked policy used to make the admission decision.
+    policy: QualificationPolicy,
+    /// Canonical digest of the exact checked policy.
+    policy_sha256: [u8; 32],
     /// Numerical and invariant comparison.
     comparison: Comparison,
 }
@@ -624,13 +744,44 @@ impl DifferentialReport {
         self.seed
     }
 
+    /// Returns a serializable evidence snapshot that carries no admission
+    /// authority and cannot be converted back into this report.
+    #[must_use]
+    pub fn audit_snapshot(&self) -> QualificationAudit {
+        QualificationAudit {
+            schema: "commutator.accelerator-qualification.v1",
+            reference_backend: self.reference_backend.clone(),
+            reference_version: self.reference_version.clone(),
+            reference_descriptor_sha256: digest_hex(&self.reference_descriptor_sha256),
+            candidate_backend: self.candidate_backend.clone(),
+            candidate_version: self.candidate_version.clone(),
+            candidate_descriptor_sha256: digest_hex(&self.candidate_descriptor_sha256),
+            worker_id: self.worker_id.clone(),
+            worker_sha256: digest_hex(&self.worker_sha256),
+            experiment_id: self.experiment_id.clone(),
+            instance_id: self.instance_id.clone(),
+            unit_id: self.unit_id.clone(),
+            generation: self.generation,
+            schema_version: self.schema_version,
+            work_sha256: digest_hex(&self.work_sha256),
+            seed: self.seed,
+            policy: self.policy.clone(),
+            policy_sha256: digest_hex(&self.policy_sha256),
+            comparison: self.comparison.clone(),
+        }
+    }
+
     fn qualifies<W: Serialize>(
         &self,
         descriptor: &BackendDescriptor,
         worker: &WorkerContext,
         work: &WorkUnit<W>,
+        policy: &QualificationPolicy,
     ) -> bool {
-        self.comparison.accepted
+        self.policy == *policy
+            && policy.accepts(&self.comparison)
+            && canonical_digest(b"commutator.qualification-policy.v1", policy)
+                .is_ok_and(|digest| digest == self.policy_sha256)
             && self.candidate_backend == descriptor.id
             && self.candidate_version == descriptor.implementation_version
             && canonical_digest(b"commutator.candidate-descriptor.v1", descriptor)
@@ -646,6 +797,98 @@ impl DifferentialReport {
             && self.seed == work.run.seed
             && canonical_digest(b"commutator.work-unit.v1", work)
                 .is_ok_and(|hash| hash == self.work_sha256)
+    }
+}
+
+/// Serializable, non-authoritative evidence from a differential check.
+///
+/// This snapshot deliberately implements `Serialize` but not `Deserialize`.
+/// Even a snapshot obtained from a trusted log cannot be used with
+/// [`ExecutionAuthorization`]; only the opaque originating
+/// [`DifferentialReport`] carries in-process admission authority.
+///
+/// ```compile_fail
+/// use experiment_accelerator::QualificationAudit;
+/// let _: QualificationAudit = serde_json::from_str("{}").unwrap();
+/// ```
+///
+/// ```compile_fail
+/// use experiment_accelerator::{ExecutionAuthorization, QualificationAudit,
+///     QualificationPolicy};
+/// # fn separate(audit: &QualificationAudit, policy: &QualificationPolicy) {
+/// let _ = ExecutionAuthorization::Differential { report: audit, policy };
+/// # }
+/// ```
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct QualificationAudit {
+    schema: &'static str,
+    reference_backend: String,
+    reference_version: String,
+    reference_descriptor_sha256: String,
+    candidate_backend: String,
+    candidate_version: String,
+    candidate_descriptor_sha256: String,
+    worker_id: String,
+    worker_sha256: String,
+    experiment_id: String,
+    instance_id: String,
+    unit_id: String,
+    generation: u64,
+    schema_version: u32,
+    work_sha256: String,
+    seed: u64,
+    policy: QualificationPolicy,
+    policy_sha256: String,
+    comparison: Comparison,
+}
+
+impl QualificationAudit {
+    /// Returns the audit schema identifier.
+    #[must_use]
+    pub const fn schema(&self) -> &str {
+        self.schema
+    }
+
+    /// Returns the exact checked policy recorded by the check.
+    #[must_use]
+    pub const fn policy(&self) -> &QualificationPolicy {
+        &self.policy
+    }
+
+    /// Returns the final, policy-enforced comparison.
+    #[must_use]
+    pub const fn comparison(&self) -> &Comparison {
+        &self.comparison
+    }
+
+    /// Returns the canonical digest of the complete reference descriptor.
+    #[must_use]
+    pub fn reference_descriptor_sha256(&self) -> &str {
+        &self.reference_descriptor_sha256
+    }
+
+    /// Returns the canonical digest of the complete candidate descriptor.
+    #[must_use]
+    pub fn candidate_descriptor_sha256(&self) -> &str {
+        &self.candidate_descriptor_sha256
+    }
+
+    /// Returns the canonical digest of the complete worker context.
+    #[must_use]
+    pub fn worker_sha256(&self) -> &str {
+        &self.worker_sha256
+    }
+
+    /// Returns the canonical digest of the typed work unit.
+    #[must_use]
+    pub fn work_sha256(&self) -> &str {
+        &self.work_sha256
+    }
+
+    /// Returns the canonical digest of the checked policy.
+    #[must_use]
+    pub fn policy_sha256(&self) -> &str {
+        &self.policy_sha256
     }
 }
 
@@ -665,15 +908,19 @@ pub enum DifferentialError<ReferenceError, CandidateError> {
 /// Runs portable and optimized backends on the same typed work unit.
 ///
 /// The returned report is bound to the work serialization, worker identity,
-/// backend identities, and implementation versions. An accepted report is
-/// required by [`execute_work_unit`] for optimized backends. The reference
-/// backend must carry a capability minted by a host-owned allowlist.
+/// complete backend descriptors, and the checked qualification policy. Its
+/// final acceptance bit enforces both policy tolerances in addition to the
+/// comparator's scientific-invariant decision. An accepted report and the
+/// identical current policy are required by [`execute_work_unit`] for an
+/// optimized backend. The reference backend must carry a capability minted by
+/// a host-owned allowlist.
 pub fn differential_check<W, R, Reference, Candidate, Comparator>(
     reference: &mut Reference,
     reference_authorization: &ReferenceAuthorization,
     candidate: &mut Candidate,
     worker: &WorkerContext,
     work: &WorkUnit<W>,
+    policy: &QualificationPolicy,
     comparator: &Comparator,
 ) -> Result<DifferentialReport, DifferentialError<Reference::Error, Candidate::Error>>
 where
@@ -710,9 +957,15 @@ where
     let candidate_output = candidate
         .execute(&work.payload, work.run.seed)
         .map_err(DifferentialError::Candidate)?;
-    let comparison = comparator
+    let mut comparison = comparator
         .compare(reference_output.payload(), candidate_output.payload())
         .map_err(DifferentialError::Comparison)?;
+    comparison.accepted = policy.accepts(&comparison);
+    let reference_descriptor_sha256 = canonical_digest(
+        b"commutator.reference-descriptor.v1",
+        reference.descriptor(),
+    )
+    .map_err(DifferentialError::InvalidBoundary)?;
     let candidate_descriptor_sha256 = canonical_digest(
         b"commutator.candidate-descriptor.v1",
         candidate.descriptor(),
@@ -722,9 +975,12 @@ where
         .map_err(DifferentialError::InvalidBoundary)?;
     let work_sha256 = canonical_digest(b"commutator.work-unit.v1", work)
         .map_err(DifferentialError::InvalidBoundary)?;
+    let policy_sha256 = canonical_digest(b"commutator.qualification-policy.v1", policy)
+        .map_err(DifferentialError::InvalidBoundary)?;
     Ok(DifferentialReport {
         reference_backend: reference.descriptor().id.clone(),
         reference_version: reference.descriptor().implementation_version.clone(),
+        reference_descriptor_sha256,
         candidate_backend: candidate.descriptor().id.clone(),
         candidate_version: candidate.descriptor().implementation_version.clone(),
         candidate_descriptor_sha256,
@@ -737,8 +993,20 @@ where
         schema_version: work.run.schema_version,
         work_sha256,
         seed: work.run.seed,
+        policy: policy.clone(),
+        policy_sha256,
         comparison,
     })
+}
+
+fn digest_hex(digest: &[u8; 32]) -> String {
+    use core::fmt::Write as _;
+
+    let mut encoded = String::with_capacity(64);
+    for byte in digest {
+        write!(&mut encoded, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    encoded
 }
 
 fn canonical_digest<T: Serialize + ?Sized>(
@@ -973,6 +1241,10 @@ mod tests {
         .unwrap()
     }
 
+    fn policy(tolerance: f64) -> QualificationPolicy {
+        QualificationPolicy::try_new("vector-max-error", "test-v1", tolerance, tolerance).unwrap()
+    }
+
     #[test]
     fn range_partition_is_complete_and_disjoint() {
         let chunks = partition_range(10, 4).unwrap();
@@ -1115,13 +1387,17 @@ mod tests {
             .unwrap()
             .remove(0);
         let authorization = reference_authorization(&reference.descriptor);
+        let policy = policy(1e-3);
         let report = differential_check(
             &mut reference,
             &authorization,
             &mut candidate,
             &worker,
             &work,
-            &VectorComparator { tolerance: 1e-3 },
+            &policy,
+            // The comparator accepts this numerical difference; the declared
+            // qualification policy must still reject it.
+            &VectorComparator { tolerance: 1.0 },
         )
         .unwrap();
         assert!(!report.comparison().accepted());
@@ -1133,10 +1409,25 @@ mod tests {
                 &worker,
                 &work,
                 1,
-                ExecutionAuthorization::Differential(&report)
+                ExecutionAuthorization::Differential {
+                    report: &report,
+                    policy: &policy,
+                }
             ),
             Err(ExecutionError::UnqualifiedBackend)
         ));
+    }
+
+    #[test]
+    fn checked_policy_rejects_invalid_deserialization() {
+        assert!(serde_json::from_str::<QualificationPolicy>(
+            r#"{"id":" ","version":"v1","absolute_tolerance":0.001,"relative_tolerance":0.001}"#
+        )
+        .is_err());
+        assert!(serde_json::from_str::<QualificationPolicy>(
+            r#"{"id":"strict","version":"v1","absolute_tolerance":-0.001,"relative_tolerance":0.001}"#
+        )
+        .is_err());
     }
 
     #[test]
@@ -1161,12 +1452,14 @@ mod tests {
             .unwrap()
             .remove(0);
         let authorization = reference_authorization(&reference.descriptor);
+        let policy = policy(1e-12);
         let report = differential_check(
             &mut reference,
             &authorization,
             &mut candidate,
             &worker,
             &work,
+            &policy,
             &VectorComparator { tolerance: 1e-12 },
         )
         .unwrap();
@@ -1176,9 +1469,33 @@ mod tests {
             &worker,
             &work,
             1,
-            ExecutionAuthorization::Differential(&report)
+            ExecutionAuthorization::Differential {
+                report: &report,
+                policy: &policy,
+            }
         )
         .is_ok());
+
+        let changed_policy = QualificationPolicy::try_new(
+            policy.id(),
+            policy.version(),
+            policy.absolute_tolerance() * 10.0,
+            policy.relative_tolerance() * 10.0,
+        )
+        .unwrap();
+        assert!(matches!(
+            execute_work_unit(
+                &mut candidate,
+                &worker,
+                &work,
+                1,
+                ExecutionAuthorization::Differential {
+                    report: &report,
+                    policy: &changed_policy,
+                }
+            ),
+            Err(ExecutionError::UnqualifiedBackend)
+        ));
 
         let mut changed = work.clone();
         changed.payload[0] = 4.0;
@@ -1188,10 +1505,72 @@ mod tests {
                 &worker,
                 &changed,
                 1,
-                ExecutionAuthorization::Differential(&report)
+                ExecutionAuthorization::Differential {
+                    report: &report,
+                    policy: &policy,
+                }
             ),
             Err(ExecutionError::UnqualifiedBackend)
         ));
+    }
+
+    #[test]
+    fn audit_snapshot_serializes_complete_evidence_without_admission_authority() {
+        let mut reference = ScaleBackend {
+            descriptor: descriptor("reference", BackendKind::CpuReference),
+            scale: 1.0,
+        };
+        let mut candidate = ScaleBackend {
+            descriptor: descriptor("gpu", BackendKind::Gpu),
+            scale: 1.0,
+        };
+        let mut worker = WorkerContext {
+            worker_id: "gpu-worker".into(),
+            ..WorkerContext::default()
+        };
+        worker
+            .capabilities
+            .insert(GPU_AVAILABLE_CAPABILITY.into(), 1.0);
+        worker.labels.insert(GPU_API_LABEL.into(), "test".into());
+        let work = independent_replica_work("diff", "run", 2, 3, 0, [(41, vec![2.0])])
+            .unwrap()
+            .remove(0);
+        let authorization = reference_authorization(&reference.descriptor);
+        let policy = policy(1e-12);
+        let report = differential_check(
+            &mut reference,
+            &authorization,
+            &mut candidate,
+            &worker,
+            &work,
+            &policy,
+            &VectorComparator { tolerance: 1e-12 },
+        )
+        .unwrap();
+
+        let audit = report.audit_snapshot();
+        let value = serde_json::to_value(&audit).unwrap();
+        assert_eq!(value["schema"], "commutator.accelerator-qualification.v1");
+        assert_eq!(value["reference_backend"], "reference");
+        assert_eq!(value["candidate_backend"], "gpu");
+        assert_eq!(value["worker_id"], "gpu-worker");
+        assert_eq!(value["experiment_id"], "diff");
+        assert_eq!(value["generation"], 2);
+        assert_eq!(value["schema_version"], 3);
+        assert_eq!(value["seed"], 41);
+        assert_eq!(value["policy"]["id"], "vector-max-error");
+        for field in [
+            "reference_descriptor_sha256",
+            "candidate_descriptor_sha256",
+            "worker_sha256",
+            "work_sha256",
+            "policy_sha256",
+        ] {
+            let digest = value[field].as_str().unwrap();
+            assert_eq!(digest.len(), 64);
+            assert!(digest.bytes().all(|byte| byte.is_ascii_hexdigit()));
+        }
+        assert!(audit.comparison().accepted());
     }
 
     #[test]
@@ -1297,12 +1676,14 @@ mod tests {
             .unwrap()
             .remove(0);
         let authorization = reference_authorization(&reference.descriptor);
+        let policy = policy(1e-12);
         let report = differential_check(
             &mut reference,
             &authorization,
             &mut candidate,
             &worker,
             &work,
+            &policy,
             &VectorComparator { tolerance: 1e-12 },
         )
         .unwrap();
@@ -1326,7 +1707,10 @@ mod tests {
                 &worker,
                 &work,
                 1,
-                ExecutionAuthorization::Differential(&report)
+                ExecutionAuthorization::Differential {
+                    report: &report,
+                    policy: &policy,
+                }
             ),
             Err(ExecutionError::UnqualifiedBackend)
         ));
@@ -1339,7 +1723,10 @@ mod tests {
                 &worker,
                 &work,
                 1,
-                ExecutionAuthorization::Differential(&report)
+                ExecutionAuthorization::Differential {
+                    report: &report,
+                    policy: &policy,
+                }
             ),
             Err(ExecutionError::UnqualifiedBackend)
         ));
