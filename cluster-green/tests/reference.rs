@@ -73,6 +73,33 @@ fn inversion_uses_pivoting_and_detects_singular_matrices() {
 }
 
 #[test]
+fn inversion_is_invariant_under_extreme_uniform_scaling() {
+    for scale in [1.0e-200, 1.0e200] {
+        let matrix = DenseMatrix::try_new(
+            2,
+            2,
+            vec![
+                Complex64::from(2.0 * scale),
+                Complex64::from(1.0 * scale),
+                Complex64::from(1.0 * scale),
+                Complex64::from(3.0 * scale),
+            ],
+        )
+        .unwrap();
+        let identity = matrix.multiply(&matrix.inverse().unwrap()).unwrap();
+        for row in 0..2 {
+            for column in 0..2 {
+                let expected = if row == column { 1.0 } else { 0.0 };
+                assert!(
+                    (identity.get(row, column).unwrap() - Complex64::from(expected)).norm()
+                        < 1.0e-12
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn periodization_uses_explicit_site_phases() {
     let z = Complex64::new(0.0, 1.0);
     let green = DenseMatrix::try_new(
@@ -135,6 +162,15 @@ fn invalid_broadening_order_causality_and_hopping_are_rejected() {
                 retarded,
                 DenseMatrix::from_scalar(Complex64::new(0.0, 1.0)).unwrap(),
             )]
+        ),
+        Err(GreenError::NonCausal { index: 0, .. })
+    ));
+    let large_real_wrong_imaginary =
+        DenseMatrix::from_scalar(Complex64::new(1.0e15, 1.0e-9)).unwrap();
+    assert!(matches!(
+        ClusterGreenGrid::try_new(
+            1,
+            vec![GreenPoint::new(retarded, large_real_wrong_imaginary)]
         ),
         Err(GreenError::NonCausal { index: 0, .. })
     ));

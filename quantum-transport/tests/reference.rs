@@ -103,6 +103,11 @@ fn invalid_hamiltonians_self_energies_and_grids_are_rejected() {
         broadening(&advanced, 1.0e-12),
         Err(TransportError::NonCausalSelfEnergy { .. })
     ));
+    let tiny_advanced = DenseMatrix::from_scalar(Complex64::new(0.0, 1.0e-200)).unwrap();
+    assert!(matches!(
+        broadening(&tiny_advanced, 1.0e-12),
+        Err(TransportError::NonCausalSelfEnergy { .. })
+    ));
     let indefinite_zero_pivot = DenseMatrix::try_new(
         2,
         2,

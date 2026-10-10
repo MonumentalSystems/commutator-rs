@@ -38,6 +38,11 @@ Periodization uses
 `G_periodized(k,z) = sum_ab exp(-i k·(r_a-r_b)) G_ab(k,z) / N`.
 Explicit site positions make the phase and normalization convention visible.
 
+Causality tolerance is relative to the spectral Hermitian matrix itself, not
+to the full magnitude of `G`; a large dispersive real part therefore cannot
+hide a wrong-sign imaginary part. Dense inversion first normalizes the input,
+so singularity decisions are invariant under uniform rescaling.
+
 This is deliberately a small dense reference implementation. Production
 solvers should use optimized linear algebra while retaining the same checked
 boundary conventions.

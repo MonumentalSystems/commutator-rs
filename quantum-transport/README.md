@@ -34,6 +34,8 @@ self-energies must give positive-semidefinite `Gamma`. A positive `eta` is
 required even when physical lead broadening already makes the inverse regular.
 Transmission is accepted only when its residual imaginary part and negative
 roundoff are within the caller's scale-aware tolerance.
+Positive-semidefinite broadening checks scale only with `Gamma` itself and do
+not impose an absolute unit-scale floor, including for very weak couplings.
 
 `landauer_integral` returns the energy integral in the same units as its grid.
 `landauer_current_ev` interprets all energies as electron-volts and returns

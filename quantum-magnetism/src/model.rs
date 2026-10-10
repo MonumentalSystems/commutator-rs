@@ -106,7 +106,8 @@ impl SpinModelBuilder {
 /// A checked finite spin-1/2 graph Hamiltonian.
 ///
 /// Computational-basis index bit `i = 1` means spin-up at site `i`, while
-/// bit `0` means spin-down. Every field `h_i` contributes `-h_i S_i^z`.
+/// bit `0` means spin-down. Consequently `S_i^y |down> = -i |up>/2` and
+/// `S_i^y |up> = i |down>/2`. Every field `h_i` contributes `-h_i S_i^z`.
 /// The exact Hilbert-space dimension is `2^spins`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SpinModel {
@@ -239,15 +240,15 @@ impl SpinModel {
 
                 let flip_both = basis ^ (1usize << bond.i) ^ (1usize << bond.j);
                 let exchange_flip = 0.25 * (jx - jy * si * sj);
-                let dm_z_flip = Complex64::new(0.0, 0.25 * dz * (si - sj));
+                let dm_z_flip = Complex64::new(0.0, 0.25 * dz * (sj - si));
                 output[flip_both] += amplitude * (Complex64::from(exchange_flip) + dm_z_flip);
 
                 let flip_i = basis ^ (1usize << bond.i);
-                let dm_i = Complex64::new(-0.25 * dy * sj, -0.25 * dx * si * sj);
+                let dm_i = Complex64::new(-0.25 * dy * sj, 0.25 * dx * si * sj);
                 output[flip_i] += amplitude * dm_i;
 
                 let flip_j = basis ^ (1usize << bond.j);
-                let dm_j = Complex64::new(0.25 * dy * si, 0.25 * dx * si * sj);
+                let dm_j = Complex64::new(0.25 * dy * si, -0.25 * dx * si * sj);
                 output[flip_j] += amplitude * dm_j;
             }
             output[basis] += amplitude * diagonal;
