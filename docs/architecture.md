@@ -40,10 +40,11 @@ training runtime, model, networking, or accelerator integration.
 `clifford-mesh` owns checked renderer-independent point, indexed-line, and
 indexed-triangle buffers plus bounded Euclidean primitive tessellators. Its
 default build is independent of graphics runtimes and algebra representations.
-The optional `cga3d` feature consumes `clifford-geometry`'s checked point and
-real-dual-sphere decomposition without decoding sparse blade positions itself.
-A checked plane adapter remains a separate integration slice; CGA circle and
-line adapters remain deferred until matching semantic decomposition APIs exist.
+The optional `cga3d` feature consumes `clifford-geometry`'s checked point,
+real-dual-sphere, direct-plane, and compact-dual-plane decomposition without
+decoding sparse blade positions itself. Plane tessellation size and resolution
+remain caller policy. CGA circle and line adapters remain deferred until
+matching semantic decomposition APIs exist.
 
 ## Experiment layer
 

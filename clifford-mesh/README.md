@@ -39,23 +39,35 @@ are limited to 1,024 and icosphere subdivision to 7 before allocation.
 
 CGA circle and line adapters are intentionally deferred. The original
 Versor-Rust drawing module's heuristic decoders do not preserve the required
-translation and homogeneous-scaling semantics. Checked point-cloud and
-real-dual-sphere adapters are available behind `cga3d`; a plane adapter remains
-a separate follow-up now that checked direct- and compact-dual-plane
-decomposition exists in `clifford-geometry`. Mesh adapters consume those
-semantic APIs rather than inspecting sparse blade slots here.
+translation and homogeneous-scaling semantics. Checked point-cloud,
+real-dual-sphere, direct-plane, and compact-dual-plane adapters are available
+behind `cga3d`. Mesh adapters consume `clifford-geometry`'s semantic APIs
+rather than inspecting sparse blade slots here. Plane adapters return the
+closest point to the origin and preserve representative orientation: a
+negative homogeneous scale reverses the normal and generated winding without
+changing the plane locus.
 
 ```rust
 # #[cfg(feature = "cga3d")]
 # {
-use clifford_geometry::cga3d::{point, Round};
-use clifford_mesh::cga3d::real_dual_sphere;
-use clifford_mesh::{primitives::icosphere, IcosphereOptions};
+use clifford_geometry::cga3d::{point, Dlp, Round};
+use clifford_geometry::mvec::Multivector;
+use clifford_mesh::cga3d::{dual_plane, real_dual_sphere};
+use clifford_mesh::{
+    primitives::{icosphere, plane_patch},
+    IcosphereOptions, PlanePatchOptions,
+};
 
 let value = Round::dls(&point(1.0, 2.0, 3.0), 2.0);
 let sphere = real_dual_sphere(&value).unwrap();
 let mesh = icosphere(&sphere, IcosphereOptions::new(2).unwrap()).unwrap();
 assert_eq!(mesh.triangle_count(), 320);
+
+let plane: Dlp = Multivector::new([0.0, 0.0, 1.0, -3.0]);
+let descriptor = dual_plane(&plane).unwrap();
+// `size` is the full side length; subdivisions are selected by the caller.
+let patch = plane_patch(&descriptor, 4.0, PlanePatchOptions::new(4, 4).unwrap()).unwrap();
+assert_eq!(patch.triangle_count(), 32);
 # }
 ```
 

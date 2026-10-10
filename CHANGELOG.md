@@ -28,6 +28,9 @@ is versioned independently; release headings include the crate name.
 - Add checked compact-dual and direct CGA plane decomposition to
   `clifford-geometry`, preserving representative orientation and correcting
   the extracted renderer helper's closest-point sign.
+- Add optional checked direct- and compact-dual-plane adapters to
+  `clifford-mesh`, composing with its existing plane patch, grid, and normal
+  indicator tessellators without embedding display-size policy.
 - Add checked, transactional harmonic-wave, tanh-interface, and physical-core
   vortex initializers to `clifford-field` without coupling them to experiment
   presets or timestep selection. Initializers never select or change boundary
