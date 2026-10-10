@@ -38,6 +38,8 @@ pub enum TomographyError {
     CountOverflow,
     /// A gauge transformation was singular at its own numeric scale.
     SingularGaugeTransform,
+    /// The supplied process-tomography probes are not informationally complete.
+    SingularProcessDesign,
     /// A Hermitian eigenvalue iteration did not converge.
     EigensolverDidNotConverge,
 }
@@ -190,6 +192,116 @@ pub fn linear_inversion(qubits: usize, expectations: &[f64], tolerance: f64) -> 
         }
     }
     Ok(Operator::try_new(d, v)?)
+}
+
+/// Returns a minimal informationally complete product-state probe design.
+///
+/// Each qubit is prepared as one of `|0>`, `|1>`, `|+>`, or `|+i>`. Every
+/// returned row contains the resulting `4^n` Pauli expectations in the same
+/// lexicographic `I,X,Y,Z` order accepted by [`linear_inversion`]. The design
+/// has exactly `4^n` probes and spans the real Hermitian operator space.
+pub fn product_probe_expectations(qubits: usize) -> Result<Vec<Vec<f64>>> {
+    let (_, pauli_count) = count(qubits)?;
+    let local = [
+        [1.0, 0.0, 0.0, 1.0],
+        [1.0, 0.0, 0.0, -1.0],
+        [1.0, 1.0, 0.0, 0.0],
+        [1.0, 0.0, 1.0, 0.0],
+    ];
+    let mut probes = Vec::new();
+    probes
+        .try_reserve_exact(pauli_count)
+        .map_err(|_| TomographyError::InvalidQubits)?;
+    for mut preparation_code in 0..pauli_count {
+        let mut preparations = vec![0usize; qubits];
+        for qubit in (0..qubits).rev() {
+            preparations[qubit] = preparation_code % 4;
+            preparation_code /= 4;
+        }
+        let mut row = Vec::new();
+        row.try_reserve_exact(pauli_count)
+            .map_err(|_| TomographyError::InvalidQubits)?;
+        for paulis in pauli_strings(qubits) {
+            let expectation = paulis
+                .iter()
+                .zip(&preparations)
+                .map(|(pauli, &preparation)| {
+                    let component = match pauli {
+                        Pauli::I => 0,
+                        Pauli::X => 1,
+                        Pauli::Y => 2,
+                        Pauli::Z => 3,
+                    };
+                    local[preparation][component]
+                })
+                .product();
+            row.push(expectation);
+        }
+        probes.push(row);
+    }
+    Ok(probes)
+}
+
+/// Linear-inverts an informationally complete quantum process into a PTM.
+///
+/// `input_expectations[k]` and `output_expectations[k]` are the measured Pauli
+/// expectation vectors before and after the same process for probe `k`. This
+/// reference inversion requires exactly `4^n` linearly independent probes;
+/// [`product_probe_expectations`] supplies a minimal checked design. Both
+/// input and output states must be normalized. The returned transfer matrix
+/// obeys `r_out = R r_in` in lexicographic `I,X,Y,Z` tensor order.
+pub fn process_linear_inversion(
+    qubits: usize,
+    input_expectations: &[Vec<f64>],
+    output_expectations: &[Vec<f64>],
+    tolerance: f64,
+) -> Result<PauliTransferMatrix> {
+    check_tol(tolerance)?;
+    let (_, pauli_count) = count(qubits)?;
+    if input_expectations.len() != pauli_count {
+        return Err(TomographyError::Shape {
+            expected: pauli_count,
+            actual: input_expectations.len(),
+        });
+    }
+    if output_expectations.len() != pauli_count {
+        return Err(TomographyError::Shape {
+            expected: pauli_count,
+            actual: output_expectations.len(),
+        });
+    }
+    for expectations in input_expectations.iter().chain(output_expectations) {
+        if expectations.len() != pauli_count {
+            return Err(TomographyError::Shape {
+                expected: pauli_count,
+                actual: expectations.len(),
+            });
+        }
+        if expectations.iter().any(|value| !value.is_finite()) {
+            return Err(TomographyError::NonFinite);
+        }
+        if (expectations[0] - 1.0).abs() > tolerance {
+            return Err(TomographyError::InvalidNormalization(expectations[0]));
+        }
+    }
+    let matrix_len = pauli_count
+        .checked_mul(pauli_count)
+        .ok_or(TomographyError::InvalidQubits)?;
+    let mut inputs = vec![0.0; matrix_len];
+    let mut outputs = vec![0.0; matrix_len];
+    for probe in 0..pauli_count {
+        for component in 0..pauli_count {
+            inputs[component * pauli_count + probe] = input_expectations[probe][component];
+            outputs[component * pauli_count + probe] = output_expectations[probe][component];
+        }
+    }
+    let inverse = invert_real_with_threshold(
+        &inputs,
+        pauli_count,
+        tolerance,
+        TomographyError::SingularProcessDesign,
+    )?;
+    PauliTransferMatrix::try_new(qubits, mat_mul(&outputs, &inverse, pauli_count))
 }
 
 fn eig(mut a: Vec<Complex64>, n: usize, tolerance: f64) -> Result<(Vec<f64>, Vec<Complex64>)> {
@@ -345,6 +457,28 @@ impl PauliTransferMatrix {
             return Err(TomographyError::NonFinite);
         }
         Ok(Self { qubits, values })
+    }
+    /// Number of qubits acted on by the process.
+    pub const fn qubits(&self) -> usize {
+        self.qubits
+    }
+    /// Row-major PTM coefficients.
+    pub fn as_slice(&self) -> &[f64] {
+        &self.values
+    }
+    /// Applies the PTM to a Pauli-expectation vector.
+    pub fn apply_expectations(&self, input: &[f64]) -> Result<Vec<f64>> {
+        let (_, expected) = count(self.qubits)?;
+        if input.len() != expected {
+            return Err(TomographyError::Shape {
+                expected,
+                actual: input.len(),
+            });
+        }
+        if input.iter().any(|value| !value.is_finite()) {
+            return Err(TomographyError::NonFinite);
+        }
+        Ok(mat_vec(&self.values, input, expected))
     }
     /// Tests trace preservation.
     pub fn is_trace_preserving(&self, t: f64) -> Result<bool> {
@@ -598,14 +732,29 @@ fn mat_mul(a: &[f64], b: &[f64], n: usize) -> Vec<f64> {
         .collect()
 }
 fn invert_real(a: &[f64], n: usize) -> Result<Vec<f64>> {
+    let relative_threshold = 64.0 * f64::EPSILON * n as f64;
+    invert_real_with_threshold(
+        a,
+        n,
+        relative_threshold,
+        TomographyError::SingularGaugeTransform,
+    )
+}
+
+fn invert_real_with_threshold(
+    a: &[f64],
+    n: usize,
+    relative_threshold: f64,
+    singular_error: TomographyError,
+) -> Result<Vec<f64>> {
     let mut l = a.to_vec();
     let scale = l
         .iter()
         .fold(0.0_f64, |scale, value| scale.max(value.abs()));
     if scale == 0.0 || !scale.is_finite() {
-        return Err(TomographyError::SingularGaugeTransform);
+        return Err(singular_error);
     }
-    let pivot_threshold = 64.0 * f64::EPSILON * n as f64 * scale;
+    let pivot_threshold = relative_threshold * scale;
     let mut r = vec![0.0; n * n];
     for i in 0..n {
         r[i * n + i] = 1.0
@@ -615,7 +764,7 @@ fn invert_real(a: &[f64], n: usize) -> Result<Vec<f64>> {
             .max_by(|&i, &j| l[i * n + k].abs().total_cmp(&l[j * n + k].abs()))
             .unwrap();
         if l[pivot * n + k].abs() <= pivot_threshold {
-            return Err(TomographyError::SingularGaugeTransform);
+            return Err(singular_error);
         }
         for j in 0..n {
             l.swap(k * n + j, pivot * n + j);

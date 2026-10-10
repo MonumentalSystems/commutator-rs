@@ -91,6 +91,63 @@ fn identity_and_depolarizing_channels() {
 }
 
 #[test]
+fn process_tomography_recovers_amplitude_damping() {
+    let damping = 0.3_f64;
+    let transverse = (1.0 - damping).sqrt();
+    let expected = PauliTransferMatrix::try_new(
+        1,
+        vec![
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            transverse,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            transverse,
+            0.0,
+            damping,
+            0.0,
+            0.0,
+            1.0 - damping,
+        ],
+    )
+    .unwrap();
+    let inputs = product_probe_expectations(1).unwrap();
+    let outputs = inputs
+        .iter()
+        .map(|input| expected.apply_expectations(input).unwrap())
+        .collect::<Vec<_>>();
+    let reconstructed = process_linear_inversion(1, &inputs, &outputs, 1e-12).unwrap();
+    assert_eq!(reconstructed.qubits(), 1);
+    for (&observed, &target) in reconstructed.as_slice().iter().zip(expected.as_slice()) {
+        assert!((observed - target).abs() < 1e-12, "{observed} != {target}");
+    }
+    assert!(reconstructed.is_trace_preserving(1e-12).unwrap());
+    assert!(!reconstructed.is_unital(1e-12).unwrap());
+    assert!(reconstructed.is_completely_positive(1e-10).unwrap());
+}
+
+#[test]
+fn process_tomography_rejects_dependent_or_unnormalized_probes() {
+    let inputs = vec![vec![1.0, 0.0, 0.0, 1.0]; 4];
+    assert_eq!(
+        process_linear_inversion(1, &inputs, &inputs, 1e-12),
+        Err(TomographyError::SingularProcessDesign)
+    );
+    let inputs = product_probe_expectations(1).unwrap();
+    let mut outputs = inputs.clone();
+    outputs[0][0] = 0.9;
+    assert_eq!(
+        process_linear_inversion(1, &inputs, &outputs, 1e-12),
+        Err(TomographyError::InvalidNormalization(0.9))
+    );
+}
+
+#[test]
 fn gst_probabilities_are_similarity_gauge_invariant() {
     let model = GateSetModel::try_new(
         vec![1.0, 0.3],

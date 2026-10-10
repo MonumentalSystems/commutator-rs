@@ -95,7 +95,7 @@ fn tdgl_order_parameter_scales_into_particle_hole_symmetric_bdg() {
         vec![Complex64::new(0.2, 0.1), Complex64::new(-0.1, 0.3)],
     )
     .unwrap();
-    let gaps: Vec<_> = order.as_slice().iter().map(|gap| *gap * 1.5).collect();
+    let gaps = tdgl.scaled_pairing_gaps(&order, 1.5).unwrap();
     let normal = NormalHamiltonian::try_from_dense(2, vec![0.0.into(); 16], 1e-12).unwrap();
     let bdg = OnsiteSWaveModel::try_new(normal, 0.0, gaps)
         .unwrap()
