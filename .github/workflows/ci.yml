@@ -31,7 +31,7 @@ jobs:
           components: rustfmt, clippy
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-      - run: cargo test --workspace --doc --locked
+      - run: cargo test --workspace --doc --all-features --locked
       - run: RUSTDOCFLAGS="-D warnings -D missing-docs" cargo doc --workspace --all-features --no-deps --locked
       - run: sha256sum --check clifford-core/tests/fixtures/clifford-golden-v1.sha256
       - run: sha256sum --check experiment-merkle/tests/fixtures/SHA256SUMS

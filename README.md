@@ -17,7 +17,7 @@ or volunteer-computing backends.
 | [`clifford-geometry`](clifford-geometry) | Fixed-size EGA, PGA, CGA, STA, and Cl(6,0) geometry with motors, conformal primitives, frames, and kinematic chains | `clifford-core` |
 | [`clifford-lattice`](clifford-lattice) | Checked Spin(6) rotors, periodic lattice storage, and a portable sequential Metropolis reference kernel | `clifford-core` |
 | [`clifford-layers`](clifford-layers) | Framework-neutral Clifford linear, convolution, normalization, and optional Fourier layers | `clifford-core`, optional RustFFT |
-| [`clifford-mesh`](clifford-mesh) | Checked renderer-independent triangle, line, and point topology with Euclidean primitive tessellators | none |
+| [`clifford-mesh`](clifford-mesh) | Checked renderer-independent topology, Euclidean tessellators, and optional CGA adapters | optional `clifford-geometry` |
 | [`experiment-core`](experiment-core) | Transport-neutral work, result, topology, verification, checkpoint-reference, and reproducibility contracts | Serde |
 | [`experiment-merkle`](experiment-merkle) | Context-bound SHA-256 commitments, inclusion proofs, and deterministic post-commitment spot checks | `experiment-core`, Serde, SHA-2 |
 | [`harmonic-dynamics`](harmonic-dynamics) | Safe `S¹`/Kuramoto, quaternion and sphere geometry, Lohe synchronization, gated scans, and Helmholtz sequence fibers | none |
@@ -74,7 +74,7 @@ clifford-core
 └── clifford-layers
 
 clifford-mesh
-(independent geometry buffers and tessellation)
+(independent by default; optional CGA adapters consume clifford-geometry)
 
 experiment-core                 harmonic-dynamics
       └── experiment-merkle      (independent numerical dynamics)
