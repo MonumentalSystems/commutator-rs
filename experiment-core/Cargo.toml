@@ -10,7 +10,7 @@ homepage.workspace = true
 documentation = "https://docs.rs/experiment-core"
 readme = "README.md"
 publish = ["crates-io"]
-keywords = ["experiment", "simulation", "distributed-computing", "reproducibility"]
+keywords = ["experiment", "simulation", "distributed", "reproducibility"]
 categories = ["science"]
 include = [
     "src/**/*.rs",
