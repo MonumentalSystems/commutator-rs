@@ -18,4 +18,6 @@ is versioned independently; release headings include the crate name.
 - Publish transport-neutral experiment and reproducibility contracts.
 - Add context-bound Merkle commitments and deterministic post-commitment spot
   checks in `experiment-merkle`.
+- Extract explicit mesh topology and corrected, bounded Euclidean tessellators
+  into the renderer-independent `clifford-mesh` crate.
 

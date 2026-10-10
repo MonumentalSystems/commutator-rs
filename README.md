@@ -17,6 +17,7 @@ or volunteer-computing backends.
 | [`clifford-geometry`](clifford-geometry) | Fixed-size EGA, PGA, CGA, STA, and Cl(6,0) geometry with motors, conformal primitives, frames, and kinematic chains | `clifford-core` |
 | [`clifford-lattice`](clifford-lattice) | Checked Spin(6) rotors, periodic lattice storage, and a portable sequential Metropolis reference kernel | `clifford-core` |
 | [`clifford-layers`](clifford-layers) | Framework-neutral Clifford linear, convolution, normalization, and optional Fourier layers | `clifford-core`, optional RustFFT |
+| [`clifford-mesh`](clifford-mesh) | Checked renderer-independent triangle, line, and point topology with Euclidean primitive tessellators | none |
 | [`experiment-core`](experiment-core) | Transport-neutral work, result, topology, verification, checkpoint-reference, and reproducibility contracts | Serde |
 | [`experiment-merkle`](experiment-merkle) | Context-bound SHA-256 commitments, inclusion proofs, and deterministic post-commitment spot checks | `experiment-core`, Serde, SHA-2 |
 | [`harmonic-dynamics`](harmonic-dynamics) | Safe quaternion and sphere geometry, Lohe synchronization, gated scans, and Helmholtz sequence fibers | none |
@@ -72,6 +73,9 @@ clifford-core
 ├── clifford-lattice
 └── clifford-layers
 
+clifford-mesh
+(independent geometry buffers and tessellation)
+
 experiment-core                 harmonic-dynamics
       └── experiment-merkle      (independent numerical dynamics)
                  ^                           ^
@@ -98,6 +102,6 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing an API or numerical
 change. Security reports should follow [SECURITY.md](SECURITY.md).
 
 The workspace is licensed under the [MIT License](LICENSE), except
-`clifford-geometry`, which preserves Versor's BSD-2-Clause license and
-attribution.
+`clifford-geometry` and `clifford-mesh`, which preserve Versor's BSD-2-Clause
+license and attribution.
 

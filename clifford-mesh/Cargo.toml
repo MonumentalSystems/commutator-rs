@@ -1,0 +1,24 @@
+[package]
+name = "clifford-mesh"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Checked renderer-independent meshes and Euclidean tessellators for geometric-algebra applications"
+license = "BSD-2-Clause"
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/clifford-mesh"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["mesh", "geometry", "tessellation", "clifford-algebra", "graphics"]
+categories = ["graphics", "mathematics", "science"]
+include = [
+    "src/**/*.rs",
+    "tests/**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "PROVENANCE.md",
+    "LICENSE",
+]
+
+[dependencies]
