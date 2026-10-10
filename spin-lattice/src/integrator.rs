@@ -71,10 +71,13 @@ impl SpinLatticeModel {
         Ok(())
     }
 
-    /// Advances coupled dynamics with spin/lattice/spin Strang ordering.
+    /// Advances coupled dynamics in half-spin/full-lattice/half-spin order.
     ///
     /// A half spin-precession step surrounds one full velocity-Verlet lattice
-    /// step. The complete operation is transactional.
+    /// step. The frozen-field spin map is first-order and not self-adjoint for
+    /// interacting spins, so this palindromic composition is not generally a
+    /// time-reversible or second-order Strang integrator. The complete
+    /// operation is transactional.
     pub fn step_coupled(
         &self,
         state: &mut SpinLatticeState,
