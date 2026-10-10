@@ -332,13 +332,8 @@ impl<R> BackendOutput<R> {
     }
 }
 
-/// Synchronous scientific compute backend.
-///
-/// Network and async hosts may call this trait inside their own task model.
-pub trait ComputeBackend<W, R> {
-    /// Backend-specific execution error.
-    type Error;
-
+/// Stable identity of a concrete compute implementation.
+pub trait BackendIdentity {
     /// Returns stable backend metadata.
     fn descriptor(&self) -> &BackendDescriptor;
     /// Returns a checked digest of the concrete executable implementation.
@@ -353,6 +348,15 @@ pub trait ComputeBackend<W, R> {
             self.descriptor(),
         )
     }
+}
+
+/// Synchronous scientific compute backend.
+///
+/// Network and async hosts may call this trait inside their own task model.
+pub trait ComputeBackend<W, R>: BackendIdentity {
+    /// Backend-specific execution error.
+    type Error;
+
     /// Executes one payload with the work unit's deterministic seed.
     fn execute(&mut self, payload: &W, seed: u64) -> Result<BackendOutput<R>, Self::Error>;
 }
@@ -362,46 +366,62 @@ pub trait ComputeBackend<W, R> {
 /// Backend implementations do not authorize themselves. The application host
 /// supplies this policy from its own allowlist or configuration boundary.
 pub trait ReferenceAuthorizer {
-    /// Returns whether `descriptor` is an approved scientific reference.
-    fn authorize(&self, descriptor: &BackendDescriptor) -> bool;
+    /// Returns whether the exact descriptor and execution fingerprint identify
+    /// an approved scientific reference.
+    fn authorize(&self, descriptor: &BackendDescriptor, execution_fingerprint: &[u8; 32]) -> bool;
 }
 
 impl<F> ReferenceAuthorizer for F
 where
-    F: Fn(&BackendDescriptor) -> bool,
+    F: Fn(&BackendDescriptor, &[u8; 32]) -> bool,
 {
-    fn authorize(&self, descriptor: &BackendDescriptor) -> bool {
-        self(descriptor)
+    fn authorize(&self, descriptor: &BackendDescriptor, execution_fingerprint: &[u8; 32]) -> bool {
+        self(descriptor, execution_fingerprint)
     }
 }
 
-/// Opaque host authorization for one exact CPU-reference descriptor.
+/// Opaque host authorization for one exact CPU-reference descriptor and
+/// concrete execution fingerprint.
 ///
 /// This capability is intentionally not deserializable. A host must recreate
 /// it from its trusted [`ReferenceAuthorizer`] after every process boundary.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReferenceAuthorization {
     descriptor_sha256: [u8; 32],
+    execution_fingerprint_sha256: [u8; 32],
 }
 
-/// Apply a host policy and authorize one exact reference descriptor.
-pub fn authorize_reference<A: ReferenceAuthorizer + ?Sized>(
+/// Apply a host policy and authorize one exact concrete reference backend.
+pub fn authorize_reference<A, B>(
     authorizer: &A,
-    descriptor: &BackendDescriptor,
-) -> Result<ReferenceAuthorization, AdapterError> {
-    if descriptor.kind != BackendKind::CpuReference || !authorizer.authorize(descriptor) {
+    backend: &B,
+) -> Result<ReferenceAuthorization, AdapterError>
+where
+    A: ReferenceAuthorizer + ?Sized,
+    B: BackendIdentity + ?Sized,
+{
+    let descriptor = backend.descriptor();
+    let execution_fingerprint_sha256 = backend.execution_fingerprint()?;
+    if descriptor.kind != BackendKind::CpuReference
+        || !authorizer.authorize(descriptor, &execution_fingerprint_sha256)
+    {
         return Err(AdapterError::UnauthorizedReference);
     }
     Ok(ReferenceAuthorization {
         descriptor_sha256: canonical_digest(b"commutator.reference-descriptor.v1", descriptor)?,
+        execution_fingerprint_sha256,
     })
 }
 
 impl ReferenceAuthorization {
-    fn authorizes(&self, descriptor: &BackendDescriptor) -> bool {
+    fn authorizes<B: BackendIdentity + ?Sized>(&self, backend: &B) -> bool {
+        let descriptor = backend.descriptor();
         descriptor.kind == BackendKind::CpuReference
             && canonical_digest(b"commutator.reference-descriptor.v1", descriptor)
                 .is_ok_and(|digest| digest == self.descriptor_sha256)
+            && backend
+                .execution_fingerprint()
+                .is_ok_and(|fingerprint| fingerprint == self.execution_fingerprint_sha256)
     }
 }
 
@@ -455,7 +475,7 @@ where
         return Err(ExecutionError::UnsupportedWorker);
     }
     let authorized = match authorization {
-        ExecutionAuthorization::Reference(reference) => reference.authorizes(backend.descriptor()),
+        ExecutionAuthorization::Reference(reference) => reference.authorizes(backend),
         ExecutionAuthorization::Differential { report, policy } => {
             backend.execution_fingerprint().is_ok_and(|fingerprint| {
                 report.qualifies(backend.descriptor(), &fingerprint, worker, work, policy)
@@ -504,13 +524,16 @@ where
     let output = backend
         .execute(&work.payload, work.run.seed)
         .map_err(ExecutionError::Backend)?;
-    if let ExecutionAuthorization::Differential { report, policy } = authorization {
-        let still_authorized = backend.execution_fingerprint().is_ok_and(|fingerprint| {
-            report.qualifies(backend.descriptor(), &fingerprint, worker, work, policy)
-        });
-        if !still_authorized {
-            return Err(ExecutionError::UnqualifiedBackend);
+    let still_authorized = match authorization {
+        ExecutionAuthorization::Reference(reference) => reference.authorizes(backend),
+        ExecutionAuthorization::Differential { report, policy } => {
+            backend.execution_fingerprint().is_ok_and(|fingerprint| {
+                report.qualifies(backend.descriptor(), &fingerprint, worker, work, policy)
+            })
         }
+    };
+    if !still_authorized {
+        return Err(ExecutionError::UnqualifiedBackend);
     }
     let (payload, metrics) = output.into_parts();
     if let Some((name, _)) = metrics
@@ -1002,7 +1025,7 @@ where
             AdapterError::EmptyWorkerIdentity,
         ));
     }
-    if !reference_authorization.authorizes(reference.descriptor()) {
+    if !reference_authorization.authorizes(reference) {
         return Err(DifferentialError::InvalidBoundary(
             AdapterError::UnauthorizedReference,
         ));
@@ -1069,6 +1092,11 @@ where
     {
         return Err(DifferentialError::InvalidBoundary(
             AdapterError::UnstableExecutionFingerprint,
+        ));
+    }
+    if !reference_authorization.authorizes(reference) {
+        return Err(DifferentialError::InvalidBoundary(
+            AdapterError::UnauthorizedReference,
         ));
     }
     let mut comparison = comparator
@@ -1273,12 +1301,14 @@ mod tests {
         scale: f64,
     }
 
-    impl ComputeBackend<Vec<f64>, Vec<f64>> for ScaleBackend {
-        type Error = ();
-
+    impl BackendIdentity for ScaleBackend {
         fn descriptor(&self) -> &BackendDescriptor {
             &self.descriptor
         }
+    }
+
+    impl ComputeBackend<Vec<f64>, Vec<f64>> for ScaleBackend {
+        type Error = ();
 
         fn execute(
             &mut self,
@@ -1299,9 +1329,7 @@ mod tests {
         mutate_on_execute: bool,
     }
 
-    impl ComputeBackend<Vec<f64>, Vec<f64>> for MutatingFingerprintBackend {
-        type Error = ();
-
+    impl BackendIdentity for MutatingFingerprintBackend {
         fn descriptor(&self) -> &BackendDescriptor {
             &self.descriptor
         }
@@ -1309,6 +1337,10 @@ mod tests {
         fn execution_fingerprint(&self) -> Result<[u8; 32], AdapterError> {
             Ok([self.fingerprint_tag; 32])
         }
+    }
+
+    impl ComputeBackend<Vec<f64>, Vec<f64>> for MutatingFingerprintBackend {
+        type Error = ();
 
         fn execute(
             &mut self,
@@ -1367,11 +1399,14 @@ mod tests {
         .unwrap()
     }
 
-    fn reference_authorization(descriptor: &BackendDescriptor) -> ReferenceAuthorization {
-        let trusted_id = descriptor.id().to_owned();
+    fn reference_authorization(backend: &impl BackendIdentity) -> ReferenceAuthorization {
+        let trusted_id = backend.descriptor().id().to_owned();
+        let trusted_fingerprint = backend.execution_fingerprint().unwrap();
         authorize_reference(
-            &|candidate: &BackendDescriptor| candidate.id() == trusted_id,
-            descriptor,
+            &|candidate: &BackendDescriptor, fingerprint: &[u8; 32]| {
+                candidate.id() == trusted_id && *fingerprint == trusted_fingerprint
+            },
+            backend,
         )
         .unwrap()
     }
@@ -1453,7 +1488,7 @@ mod tests {
             ..WorkerContext::default()
         };
         worker.labels.insert("host".into(), "ci".into());
-        let authorization = reference_authorization(&backend.descriptor);
+        let authorization = reference_authorization(&backend);
         let result = execute_work_unit(
             &mut backend,
             &worker,
@@ -1521,7 +1556,7 @@ mod tests {
         let work = independent_replica_work("diff", "run", 0, 1, 0, [(99, vec![1.0, 2.0])])
             .unwrap()
             .remove(0);
-        let authorization = reference_authorization(&reference.descriptor);
+        let authorization = reference_authorization(&reference);
         let policy = policy(1e-3);
         let report = differential_check(
             &mut reference,
@@ -1586,7 +1621,7 @@ mod tests {
         let work = independent_replica_work("diff", "run", 0, 1, 0, [(7, vec![3.0])])
             .unwrap()
             .remove(0);
-        let authorization = reference_authorization(&reference.descriptor);
+        let authorization = reference_authorization(&reference);
         let policy = policy(1e-12);
         let report = differential_check(
             &mut reference,
@@ -1670,7 +1705,7 @@ mod tests {
         let work = independent_replica_work("diff", "run", 2, 3, 0, [(41, vec![2.0])])
             .unwrap()
             .remove(0);
-        let authorization = reference_authorization(&reference.descriptor);
+        let authorization = reference_authorization(&reference);
         let policy = policy(1e-12);
         let report = differential_check(
             &mut reference,
@@ -1732,7 +1767,7 @@ mod tests {
         let work = independent_replica_work("diff", "run", 0, 1, 0, [(17, vec![2.0])])
             .unwrap()
             .remove(0);
-        let authorization = reference_authorization(&reference.descriptor);
+        let authorization = reference_authorization(&reference);
         let policy = policy(1e-12);
         let report = differential_check(
             &mut reference,
@@ -1807,22 +1842,28 @@ mod tests {
 
     #[test]
     fn host_authorization_cannot_be_reused_for_another_reference() {
-        let allowed = descriptor("reference-a", BackendKind::CpuReference);
-        let denied = descriptor("reference-b", BackendKind::CpuReference);
+        let allowed = ScaleBackend {
+            descriptor: descriptor("reference-a", BackendKind::CpuReference),
+            scale: 1.0,
+        };
+        let denied = ScaleBackend {
+            descriptor: descriptor("reference-b", BackendKind::CpuReference),
+            scale: 1.0,
+        };
+        let allowed_fingerprint = allowed.execution_fingerprint().unwrap();
         let authorization = authorize_reference(
-            &|candidate: &BackendDescriptor| candidate.id() == "reference-a",
+            &|candidate: &BackendDescriptor, fingerprint: &[u8; 32]| {
+                candidate.id() == "reference-a" && *fingerprint == allowed_fingerprint
+            },
             &allowed,
         )
         .unwrap();
         assert_eq!(
-            authorize_reference(&|_: &BackendDescriptor| false, &denied),
+            authorize_reference(&|_: &BackendDescriptor, _: &[u8; 32]| false, &denied),
             Err(AdapterError::UnauthorizedReference)
         );
 
-        let mut backend = ScaleBackend {
-            descriptor: denied,
-            scale: 1.0,
-        };
+        let mut backend = denied;
         let worker = WorkerContext {
             worker_id: "worker".into(),
             ..WorkerContext::default()
@@ -1839,6 +1880,126 @@ mod tests {
                 ExecutionAuthorization::Reference(&authorization)
             ),
             Err(ExecutionError::UnqualifiedBackend)
+        ));
+    }
+
+    #[test]
+    fn reference_authorization_rejects_same_descriptor_with_another_fingerprint() {
+        let shared_descriptor = descriptor("reference", BackendKind::CpuReference);
+        let allowed = MutatingFingerprintBackend {
+            descriptor: shared_descriptor.clone(),
+            fingerprint_tag: 11,
+            mutate_on_execute: false,
+        };
+        let authorization = reference_authorization(&allowed);
+        let mut substituted = MutatingFingerprintBackend {
+            descriptor: shared_descriptor,
+            fingerprint_tag: 12,
+            mutate_on_execute: false,
+        };
+        let worker = WorkerContext {
+            worker_id: "worker".into(),
+            ..WorkerContext::default()
+        };
+        let work = independent_replica_work("demo", "run", 0, 1, 0, [(1, vec![1.0])])
+            .unwrap()
+            .remove(0);
+        assert!(matches!(
+            execute_work_unit(
+                &mut substituted,
+                &worker,
+                &work,
+                1,
+                ExecutionAuthorization::Reference(&authorization),
+            ),
+            Err(ExecutionError::UnqualifiedBackend)
+        ));
+
+        let mut candidate = ScaleBackend {
+            descriptor: descriptor("candidate", BackendKind::Gpu),
+            scale: 1.0,
+        };
+        let mut gpu_worker = worker;
+        gpu_worker
+            .capabilities
+            .insert(GPU_AVAILABLE_CAPABILITY.into(), 1.0);
+        gpu_worker
+            .labels
+            .insert(GPU_API_LABEL.into(), "test".into());
+        assert!(matches!(
+            differential_check(
+                &mut substituted,
+                &authorization,
+                &mut candidate,
+                &gpu_worker,
+                &work,
+                &policy(1e-12),
+                &VectorComparator { tolerance: 1e-12 },
+            ),
+            Err(DifferentialError::InvalidBoundary(
+                AdapterError::UnauthorizedReference
+            ))
+        ));
+    }
+
+    #[test]
+    fn mutating_reference_fingerprint_is_rejected_after_execution() {
+        let mut reference = MutatingFingerprintBackend {
+            descriptor: descriptor("reference", BackendKind::CpuReference),
+            fingerprint_tag: 21,
+            mutate_on_execute: false,
+        };
+        let authorization = reference_authorization(&reference);
+        reference.mutate_on_execute = true;
+        let worker = WorkerContext {
+            worker_id: "worker".into(),
+            ..WorkerContext::default()
+        };
+        let work = independent_replica_work("demo", "run", 0, 1, 0, [(1, vec![1.0])])
+            .unwrap()
+            .remove(0);
+        assert!(matches!(
+            execute_work_unit(
+                &mut reference,
+                &worker,
+                &work,
+                1,
+                ExecutionAuthorization::Reference(&authorization),
+            ),
+            Err(ExecutionError::UnqualifiedBackend)
+        ));
+
+        let mut qualifying_reference = MutatingFingerprintBackend {
+            descriptor: descriptor("qualifying-reference", BackendKind::CpuReference),
+            fingerprint_tag: 31,
+            mutate_on_execute: false,
+        };
+        let qualifying_authorization = reference_authorization(&qualifying_reference);
+        qualifying_reference.mutate_on_execute = true;
+        let mut candidate = ScaleBackend {
+            descriptor: descriptor("candidate", BackendKind::Gpu),
+            scale: 1.0,
+        };
+        let mut gpu_worker = worker;
+        gpu_worker
+            .capabilities
+            .insert(GPU_AVAILABLE_CAPABILITY.into(), 1.0);
+        gpu_worker
+            .labels
+            .insert(GPU_API_LABEL.into(), "test".into());
+        assert!(matches!(
+            differential_check(
+                &mut qualifying_reference,
+                &qualifying_authorization,
+                &mut candidate,
+                &gpu_worker,
+                &work,
+                &policy(1e-12),
+                &VectorComparator { tolerance: 1e-12 },
+            ),
+            Err(DifferentialError::InvalidBoundary(
+                AdapterError::UnstableExecutionFingerprint
+            ))
         ));
     }
 
@@ -1863,7 +2024,7 @@ mod tests {
         let work = independent_replica_work("diff", "run", 0, 1, 0, [(3, vec![2.0])])
             .unwrap()
             .remove(0);
-        let authorization = reference_authorization(&reference.descriptor);
+        let authorization = reference_authorization(&reference);
         let policy = policy(1e-12);
         let report = differential_check(
             &mut reference,
@@ -1952,7 +2113,7 @@ mod tests {
             descriptor: descriptor("reference", BackendKind::CpuReference),
             scale: 1.0,
         };
-        let authorization = reference_authorization(&backend.descriptor);
+        let authorization = reference_authorization(&backend);
         let mut work = independent_replica_work("demo", "run", 0, 1, 0, [(1, vec![1.0])])
             .unwrap()
             .remove(0);

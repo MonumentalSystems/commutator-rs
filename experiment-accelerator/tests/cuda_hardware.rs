@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use experiment_accelerator::{
     authorize_reference, differential_check, independent_replica_work, AdapterError,
-    AffineCpuBackend, AffineVectorWork, BackendDescriptor, Comparison, ComputeBackend,
+    AffineCpuBackend, AffineVectorWork, BackendDescriptor, BackendIdentity, Comparison,
     CudaAffineBackend, QualificationPolicy, ResultComparator, WorkerContext, GPU_API_LABEL,
     GPU_AVAILABLE_CAPABILITY,
 };
@@ -49,9 +49,12 @@ fn real_cuda_affine_backend_is_differentially_qualified() {
     let work = independent_replica_work("cuda-affine", "hardware", 0, 1, 0, [(17, payload)])
         .unwrap()
         .remove(0);
+    let reference_fingerprint = reference.execution_fingerprint().unwrap();
     let authorization = authorize_reference(
-        &|descriptor: &BackendDescriptor| descriptor.id() == "affine-cpu",
-        reference.descriptor(),
+        &|descriptor: &BackendDescriptor, fingerprint: &[u8; 32]| {
+            descriptor.id() == "affine-cpu" && *fingerprint == reference_fingerprint
+        },
+        &reference,
     )
     .unwrap();
     let policy = QualificationPolicy::try_new("f64-affine", "v1", 1e-14, 1e-14).unwrap();

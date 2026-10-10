@@ -72,6 +72,9 @@ checked in-process before and after execution. Separate serialize-only audit
 snapshots expose digests and the policy/comparison as a commitment summary, not
 the raw descriptor, worker, or work preimages, and provide no path back to
 admission authority.
+Host-minted reference authorization separately binds both the approved
+descriptor and concrete execution fingerprint and rechecks them before and
+after direct or differential reference execution.
 The default feature set contains no hardware API, and the crate contains no
 network transport. Neither configuration turns untrusted serialized evidence
 into an admission token.

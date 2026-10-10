@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 
 use experiment_accelerator::{
     authorize_reference, differential_check, independent_replica_work, AdapterError,
-    AffineCpuBackend, AffineVectorWork, BackendDescriptor, Comparison, ComputeBackend,
-    CudaAffineBackend, QualificationPolicy, ResultComparator, WorkerContext, GPU_API_LABEL,
-    GPU_AVAILABLE_CAPABILITY,
+    AffineCpuBackend, AffineVectorWork, BackendDescriptor, BackendIdentity, Comparison,
+    ComputeBackend, CudaAffineBackend, QualificationPolicy, ResultComparator, WorkerContext,
+    GPU_API_LABEL, GPU_AVAILABLE_CAPABILITY,
 };
 use serde_json::json;
 
@@ -54,9 +54,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let payload = AffineVectorWork::try_new(vec![-3.0, -0.5, 0.0, 0.25, 2.0, 1.0e6], 1.75, -0.125)?;
     let work =
         independent_replica_work("cuda-affine", "hardware", 0, 1, 0, [(17, payload)])?.remove(0);
+    let reference_fingerprint = reference.execution_fingerprint()?;
     let authorization = authorize_reference(
-        &|descriptor: &BackendDescriptor| descriptor.id() == "affine-cpu",
-        reference.descriptor(),
+        &|descriptor: &BackendDescriptor, fingerprint: &[u8; 32]| {
+            descriptor.id() == "affine-cpu" && *fingerprint == reference_fingerprint
+        },
+        &reference,
     )?;
     let policy = QualificationPolicy::try_new("f64-affine", "v1", 1e-14, 1e-14)?;
     let report = differential_check(
@@ -70,7 +73,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .map_err(|error| format!("differential validation failed: {error:?}"))?;
     let audit = report.audit_snapshot();
-    let reference_fingerprint = reference.execution_fingerprint()?;
     let candidate_fingerprint = cuda.execution_fingerprint()?;
     let reference_output = reference.execute(&work.payload, work.run.seed)?;
     let candidate_output = cuda.execute(&work.payload, work.run.seed)?;

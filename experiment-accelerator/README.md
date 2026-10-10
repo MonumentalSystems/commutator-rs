@@ -57,6 +57,11 @@ the raw descriptor, worker, work, and implementation inputs and sign or
 authenticate the resulting artifact when persisting or transmitting it. The
 host must recreate authorization from a trusted reference allowlist after
 restart. An audit summary cannot recreate an admission capability.
+Reference authorization is likewise host-owned and opaque: `authorize_reference`
+takes a concrete backend, presents both its descriptor and execution fingerprint
+to the host policy, and binds both into the capability. Direct reference runs
+and differential checks revalidate that pair after execution, so a descriptor
+cannot authorize substituted or mutating reference code.
 Work binding uses domain-separated SHA-256 over recursively key-sorted canonical
 JSON; payload types therefore need stable Serde value semantics.
 

@@ -4,8 +4,8 @@ use std::marker::PhantomData;
 use serde::Serialize;
 
 use crate::{
-    canonical_digest, partition_range, AdapterError, BackendDescriptor, BackendKind, BackendOutput,
-    ComputeBackend, Precision,
+    canonical_digest, partition_range, AdapterError, BackendDescriptor, BackendIdentity,
+    BackendKind, BackendOutput, ComputeBackend, Precision,
 };
 
 const PARTITION_ALGORITHM: &str = "contiguous-ceiling-at-most-one-per-child-v1";
@@ -173,15 +173,10 @@ where
     }
 }
 
-impl<W, R, B> ComputeBackend<Vec<W>, Vec<R>> for ThreadedShardedBackend<B, W, R>
+impl<B, W, R> BackendIdentity for ThreadedShardedBackend<B, W, R>
 where
-    W: Clone + Send + Sync,
-    R: Send,
-    B: ComputeBackend<Vec<W>, Vec<R>> + Send,
-    B::Error: Send,
+    B: BackendIdentity,
 {
-    type Error = ShardedError<B::Error>;
-
     fn descriptor(&self) -> &BackendDescriptor {
         &self.descriptor
     }
@@ -210,6 +205,16 @@ where
             },
         )
     }
+}
+
+impl<W, R, B> ComputeBackend<Vec<W>, Vec<R>> for ThreadedShardedBackend<B, W, R>
+where
+    W: Clone + Send + Sync,
+    R: Send,
+    B: ComputeBackend<Vec<W>, Vec<R>> + Send,
+    B::Error: Send,
+{
+    type Error = ShardedError<B::Error>;
 
     fn execute(
         &mut self,

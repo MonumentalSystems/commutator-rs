@@ -2,9 +2,10 @@ use std::collections::BTreeMap;
 
 use experiment_accelerator::{
     authorize_reference, differential_check, execute_work_unit, independent_replica_work,
-    AdapterError, AffineCpuBackend, AffineVectorWork, BackendDescriptor, BackendKind,
-    BackendOutput, Comparison, ComputeBackend, ExecutionAuthorization, ExecutionError, Precision,
-    QualificationPolicy, ResultComparator, ShardedError, ThreadedShardedBackend, WorkerContext,
+    AdapterError, AffineCpuBackend, AffineVectorWork, BackendDescriptor, BackendIdentity,
+    BackendKind, BackendOutput, Comparison, ComputeBackend, ExecutionAuthorization, ExecutionError,
+    Precision, QualificationPolicy, ResultComparator, ShardedError, ThreadedShardedBackend,
+    WorkerContext,
 };
 
 struct ExactComparator;
@@ -74,9 +75,7 @@ impl MapBackend {
     }
 }
 
-impl ComputeBackend<Vec<i64>, Vec<i64>> for MapBackend {
-    type Error = &'static str;
-
+impl BackendIdentity for MapBackend {
     fn descriptor(&self) -> &BackendDescriptor {
         &self.descriptor
     }
@@ -84,6 +83,10 @@ impl ComputeBackend<Vec<i64>, Vec<i64>> for MapBackend {
     fn execution_fingerprint(&self) -> Result<[u8; 32], AdapterError> {
         Ok([self.execution_tag; 32])
     }
+}
+
+impl ComputeBackend<Vec<i64>, Vec<i64>> for MapBackend {
+    type Error = &'static str;
 
     fn execute(
         &mut self,
@@ -237,9 +240,12 @@ fn distributed_adapter_is_differentially_qualifiable() {
     let work = independent_replica_work("sharded", "run", 0, 1, 0, [(77, (0..17).collect())])
         .unwrap()
         .remove(0);
+    let reference_fingerprint = reference.execution_fingerprint().unwrap();
     let reference_authorization = authorize_reference(
-        &|descriptor: &BackendDescriptor| descriptor.id() == "map-reference",
-        reference.descriptor(),
+        &|descriptor: &BackendDescriptor, fingerprint: &[u8; 32]| {
+            descriptor.id() == "map-reference" && *fingerprint == reference_fingerprint
+        },
+        &reference,
     )
     .unwrap();
     let policy = QualificationPolicy::try_new("exact-integers", "v1", 0.0, 0.0).unwrap();

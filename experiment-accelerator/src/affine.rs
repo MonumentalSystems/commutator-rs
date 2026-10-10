@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use serde::Serialize;
 
 use crate::{
-    canonical_digest, AdapterError, BackendDescriptor, BackendKind, BackendOutput, ComputeBackend,
-    Precision,
+    canonical_digest, AdapterError, BackendDescriptor, BackendIdentity, BackendKind, BackendOutput,
+    ComputeBackend, Precision,
 };
 
 #[derive(Serialize)]
@@ -124,9 +124,7 @@ impl AffineCpuBackend {
     }
 }
 
-impl ComputeBackend<AffineVectorWork, Vec<f64>> for AffineCpuBackend {
-    type Error = AffineError;
-
+impl BackendIdentity for AffineCpuBackend {
     fn descriptor(&self) -> &BackendDescriptor {
         &self.descriptor
     }
@@ -142,6 +140,10 @@ impl ComputeBackend<AffineVectorWork, Vec<f64>> for AffineCpuBackend {
             },
         )
     }
+}
+
+impl ComputeBackend<AffineVectorWork, Vec<f64>> for AffineCpuBackend {
+    type Error = AffineError;
 
     fn execute(
         &mut self,

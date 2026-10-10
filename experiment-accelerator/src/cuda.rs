@@ -9,8 +9,8 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    canonical_digest, AdapterError, AffineVectorWork, BackendDescriptor, BackendKind,
-    BackendOutput, ComputeBackend, Precision, GPU_API_LABEL, GPU_AVAILABLE_CAPABILITY,
+    canonical_digest, AdapterError, AffineVectorWork, BackendDescriptor, BackendIdentity,
+    BackendKind, BackendOutput, ComputeBackend, Precision, GPU_API_LABEL, GPU_AVAILABLE_CAPABILITY,
 };
 
 const MODULE_NAME: &str = "experiment_accelerator_affine_f64";
@@ -243,9 +243,7 @@ impl CudaAffineBackend {
     }
 }
 
-impl ComputeBackend<AffineVectorWork, Vec<f64>> for CudaAffineBackend {
-    type Error = CudaAffineError;
-
+impl BackendIdentity for CudaAffineBackend {
     fn descriptor(&self) -> &BackendDescriptor {
         &self.descriptor
     }
@@ -272,6 +270,10 @@ impl ComputeBackend<AffineVectorWork, Vec<f64>> for CudaAffineBackend {
             },
         )
     }
+}
+
+impl ComputeBackend<AffineVectorWork, Vec<f64>> for CudaAffineBackend {
+    type Error = CudaAffineError;
 
     fn execute(
         &mut self,
