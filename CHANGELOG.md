@@ -5,6 +5,14 @@ is versioned independently; release headings include the crate name.
 
 ## Unreleased
 
+- Add a focused research suite spanning matrix-free Lyapunov spectra, quantum
+  chaos diagnostics, frustrated quantum magnetism, magnetoelastic dynamics,
+  BdG superconductivity, sparse Majorana fermions, cluster Green functions,
+  coherent quantum transport, finite-Fock quantum light, and classical-shadow
+  measurement reduction.
+- Standardize public quantum amplitudes on `num_complex::Complex64` and reuse
+  `cluster-green` matrix conventions in transport calculations.
+
 - Establish the public foundational workspace.
 - Freeze cross-implementation Clifford conventions and golden vectors.
 - Publish portable Cl(1,3) field operators, reference steppers, and analysis.

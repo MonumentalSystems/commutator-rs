@@ -21,8 +21,12 @@ cargo fmt --all --check
 cargo test --workspace --all-targets --all-features --locked
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 RUSTDOCFLAGS="-D warnings -D missing-docs" cargo doc --workspace --all-features --no-deps --locked
-cargo package -p clifford-core -p clifford-field -p clifford-geometry -p clifford-lattice -p clifford-layers -p clifford-mesh -p experiment-core -p experiment-merkle -p harmonic-dynamics --locked
+cargo package -p clifford-core -p clifford-field -p clifford-geometry -p clifford-lattice -p clifford-layers -p clifford-mesh -p experiment-core -p experiment-merkle -p harmonic-dynamics -p field-lyapunov -p quantum-chaos -p quantum-magnetism -p spin-lattice -p superconductivity -p majorana-fermions -p cluster-green -p quantum-transport -p quantum-light -p quantum-shadows --no-verify --locked
 ```
+
+The workspace package check uses `--no-verify` because crates.io cannot resolve
+unpublished path dependencies. Before publishing a dependent crate, repeat its
+package verification after its dependencies are available from the registry.
 
 ## Compatibility fixtures
 
