@@ -22,4 +22,3 @@ include = [
 
 [dependencies]
 cluster-green = { version = "0.1.0", path = "../cluster-green" }
-
