@@ -12,7 +12,8 @@ The first release includes:
 - complex state vectors, normalization, creation, and annihilation operators;
 - phase shifters and exact two-mode lossless beam splitters;
 - photon-number distributions, coincidences, and second-order coherence;
-- pure-state density matrices, one-mode reductions, and purity; and
+- allocation-bounded pure-state density matrices, direct one-mode reductions,
+  and purity; and
 - truncated two-mode squeezed-vacuum states.
 
 ```rust
@@ -31,6 +32,11 @@ This is a deterministic CPU reference implementation, not a large-scale
 Gaussian-boson sampler, Maxwell solver, or hardware-control package. Per-mode
 cutoffs are explicit; transformations fail instead of silently discarding
 amplitude outside the represented space.
+
+Dense density matrices are limited to 1,048,576 complex entries (16 MiB).
+Call `StateVector::reduced_mode` to compute a normalized one-mode marginal
+directly in local-matrix memory; `DensityMatrix::reduced_mode` remains
+available when a full density matrix is already needed for other work.
 
 ## Basis convention
 

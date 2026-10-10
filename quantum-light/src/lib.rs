@@ -15,6 +15,13 @@ pub use num_complex::Complex64;
 const MAX_STATE_DIMENSION: usize = 1 << 20;
 const MAX_OCCUPATION: usize = 64;
 
+/// Maximum number of complex entries allocated by [`StateVector::density_matrix`].
+///
+/// This limits a dense density matrix to 1,048,576 entries (16 MiB for
+/// [`Complex64`]). Use [`StateVector::reduced_mode`] when only a one-mode
+/// marginal is needed.
+pub const MAX_DENSITY_MATRIX_ELEMENTS: usize = 1 << 20;
+
 /// Errors returned by checked quantum-light kernels.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum QuantumLightError {
@@ -65,6 +72,18 @@ pub enum QuantumLightError {
     NonFiniteInput,
     /// A zero vector cannot be normalized or used for normalized observables.
     ZeroNorm,
+    /// Squaring the Hilbert-space dimension overflowed `usize`.
+    DensityMatrixSizeOverflow {
+        /// Hilbert-space dimension whose square overflowed.
+        dimension: usize,
+    },
+    /// A dense density matrix would exceed the allocation safety limit.
+    DensityMatrixTooLarge {
+        /// Number of complex entries required by the matrix.
+        required_elements: usize,
+        /// Maximum number of complex entries this crate will allocate.
+        maximum_elements: usize,
+    },
     /// The configured cutoff cannot represent every output of an operation.
     CutoffTooSmall {
         /// Minimum occupation required to represent the result.
@@ -372,10 +391,12 @@ impl StateVector {
         if !phase.is_finite() {
             return Err(QuantumLightError::NonFiniteInput);
         }
+        // Reduce first so multiplying by a finite occupation cannot overflow.
+        let reduced_phase = phase.rem_euclid(core::f64::consts::TAU);
         let mut output = self.clone();
         for (index, amplitude) in output.amplitudes.iter_mut().enumerate() {
             let occupation = self.space.occupations(index)?[mode];
-            let angle = phase * occupation as f64;
+            let angle = reduced_phase * occupation as f64;
             *amplitude *= Complex64::new(angle.cos(), angle.sin());
         }
         Ok(output)
@@ -391,42 +412,41 @@ impl StateVector {
         if !theta.is_finite() {
             return Err(QuantumLightError::NonFiniteInput);
         }
-        for (index, amplitude) in self.amplitudes.iter().enumerate() {
-            if amplitude.norm_sqr() == 0.0 {
-                continue;
-            }
-            let occupations = self.space.occupations(index)?;
-            let required = occupations[mode_a] + occupations[mode_b];
-            if required > self.space.max_occupation {
-                return Err(QuantumLightError::CutoffTooSmall {
-                    required,
-                    maximum: self.space.max_occupation,
-                });
-            }
-        }
-
         let cosine = theta.cos();
         let sine = theta.sin();
         let mut output = vec![Complex64::new(0.0, 0.0); self.space.dimension];
         for (index, &amplitude) in self.amplitudes.iter().enumerate() {
-            if amplitude.norm_sqr() == 0.0 {
+            if amplitude == Complex64::new(0.0, 0.0) {
                 continue;
             }
             let mut occupations = self.space.occupations(index)?;
             let n = occupations[mode_a];
             let m = occupations[mode_b];
             let total = n + m;
-            for from_a_to_a in 0..=n {
-                for from_b_to_a in 0..=m {
-                    let output_a = from_a_to_a + from_b_to_a;
-                    let output_b = total - output_a;
-                    occupations[mode_a] = output_a;
-                    occupations[mode_b] = output_b;
-                    let destination = self.space.basis_index(&occupations)?;
-                    let coefficient =
-                        beam_splitter_coefficient(n, m, from_a_to_a, from_b_to_a, cosine, sine);
-                    output[destination] += amplitude * coefficient;
+            for output_a in 0..=total {
+                let first_from_a = output_a.saturating_sub(m);
+                let last_from_a = n.min(output_a);
+                let coefficient: f64 = (first_from_a..=last_from_a)
+                    .map(|from_a_to_a| {
+                        let from_b_to_a = output_a - from_a_to_a;
+                        beam_splitter_coefficient(n, m, from_a_to_a, from_b_to_a, cosine, sine)
+                    })
+                    .sum();
+                if coefficient == 0.0 {
+                    continue;
                 }
+                let output_b = total - output_a;
+                let required = output_a.max(output_b);
+                if required > self.space.max_occupation {
+                    return Err(QuantumLightError::CutoffTooSmall {
+                        required,
+                        maximum: self.space.max_occupation,
+                    });
+                }
+                occupations[mode_a] = output_a;
+                occupations[mode_b] = output_b;
+                let destination = self.space.basis_index(&occupations)?;
+                output[destination] += amplitude * coefficient;
             }
         }
         Self::try_from_amplitudes(self.space, output)
@@ -489,10 +509,15 @@ impl StateVector {
     }
 
     /// Forms the pure-state density matrix `|psi><psi|` after normalization.
+    ///
+    /// Dense allocation is limited to [`MAX_DENSITY_MATRIX_ELEMENTS`]. When
+    /// only a one-mode marginal is needed, prefer [`Self::reduced_mode`],
+    /// which does not materialize this full matrix.
     pub fn density_matrix(&self) -> Result<DensityMatrix> {
-        let normalized = self.normalized()?;
         let dimension = self.space.dimension;
-        let mut elements = vec![Complex64::new(0.0, 0.0); dimension * dimension];
+        let element_count = checked_density_matrix_elements(dimension)?;
+        let normalized = self.normalized()?;
+        let mut elements = vec![Complex64::new(0.0, 0.0); element_count];
         for row in 0..dimension {
             for column in 0..dimension {
                 elements[row * dimension + column] =
@@ -502,6 +527,43 @@ impl StateVector {
         Ok(DensityMatrix {
             space: self.space,
             dimension,
+            elements,
+        })
+    }
+
+    /// Traces out every mode except one without constructing a full density matrix.
+    ///
+    /// The returned matrix is normalized by this vector's stored norm. The
+    /// computation uses `O(D d)` time and `O(d²)` additional memory for total
+    /// Hilbert-space dimension `D` and local dimension `d`.
+    pub fn reduced_mode(&self, mode: usize) -> Result<ReducedDensityMatrix> {
+        self.space.check_mode(mode)?;
+        let norm = self.checked_norm()?;
+        let local_dimension = self.space.max_occupation + 1;
+        let local_element_count = local_dimension.checked_mul(local_dimension).ok_or(
+            QuantumLightError::DensityMatrixSizeOverflow {
+                dimension: local_dimension,
+            },
+        )?;
+        let mut elements = vec![Complex64::new(0.0, 0.0); local_element_count];
+
+        let mode_stride = (0..mode).fold(1, |stride, _| stride * local_dimension);
+        let block_size = mode_stride * local_dimension;
+        for block_start in (0..self.space.dimension).step_by(block_size) {
+            for environment_offset in 0..mode_stride {
+                for local_row in 0..local_dimension {
+                    let row = block_start + local_row * mode_stride + environment_offset;
+                    for local_column in 0..local_dimension {
+                        let column = block_start + local_column * mode_stride + environment_offset;
+                        elements[local_row * local_dimension + local_column] +=
+                            self.amplitudes[row] * self.amplitudes[column].conj() / norm;
+                    }
+                }
+            }
+        }
+
+        Ok(ReducedDensityMatrix {
+            dimension: local_dimension,
             elements,
         })
     }
@@ -625,6 +687,20 @@ fn validate_two_modes(space: FockSpace, mode_a: usize, mode_b: usize) -> Result<
     }
 }
 
+fn checked_density_matrix_elements(dimension: usize) -> Result<usize> {
+    let required_elements = dimension
+        .checked_mul(dimension)
+        .ok_or(QuantumLightError::DensityMatrixSizeOverflow { dimension })?;
+    if required_elements > MAX_DENSITY_MATRIX_ELEMENTS {
+        Err(QuantumLightError::DensityMatrixTooLarge {
+            required_elements,
+            maximum_elements: MAX_DENSITY_MATRIX_ELEMENTS,
+        })
+    } else {
+        Ok(required_elements)
+    }
+}
+
 fn ln_factorial(value: usize) -> f64 {
     (2..=value).map(|factor| (factor as f64).ln()).sum()
 }
@@ -660,6 +736,13 @@ mod tests {
     fn close(actual: f64, expected: f64) {
         assert!(
             (actual - expected).abs() < 1.0e-11,
+            "{actual} != {expected}"
+        );
+    }
+
+    fn complex_close(actual: Complex64, expected: Complex64) {
+        assert!(
+            (actual - expected).norm() < 1.0e-11,
             "{actual} != {expected}"
         );
     }
@@ -718,6 +801,13 @@ mod tests {
     }
 
     #[test]
+    fn beam_splitter_allows_exact_identity_at_tight_cutoff() {
+        let space = FockSpace::try_new(2, 1).unwrap();
+        let input = StateVector::basis(space, &[1, 1]).unwrap();
+        assert_eq!(input.beam_splitter(0, 1, 0.0).unwrap(), input);
+    }
+
+    #[test]
     fn number_state_statistics_are_exact() {
         let space = FockSpace::try_new(2, 4).unwrap();
         let state = StateVector::basis(space, &[2, 3]).unwrap();
@@ -763,6 +853,68 @@ mod tests {
                 output.probability(&occupations).unwrap(),
             );
         }
+    }
+
+    #[test]
+    fn phase_shift_reduces_large_finite_angles_before_multiplication() {
+        let space = FockSpace::try_new(1, MAX_OCCUPATION).unwrap();
+        let input = StateVector::basis(space, &[MAX_OCCUPATION]).unwrap();
+        let output = input.phase_shift(0, f64::MAX).unwrap();
+        let amplitude = output.amplitudes()[MAX_OCCUPATION];
+        assert!(amplitude.re.is_finite() && amplitude.im.is_finite());
+        close(output.norm_squared(), 1.0);
+    }
+
+    #[test]
+    fn direct_reduction_matches_full_density_matrix() {
+        let space = FockSpace::try_new(3, 2).unwrap();
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0); space.dimension()];
+        amplitudes[space.basis_index(&[0, 1, 2]).unwrap()] = Complex64::new(2.0, -1.0);
+        amplitudes[space.basis_index(&[2, 1, 0]).unwrap()] = Complex64::new(-0.5, 0.75);
+        amplitudes[space.basis_index(&[1, 0, 2]).unwrap()] = Complex64::new(0.25, 1.5);
+        let state = StateVector::try_from_amplitudes(space, amplitudes).unwrap();
+
+        for mode in 0..space.modes() {
+            let direct = state.reduced_mode(mode).unwrap();
+            let via_full = state.density_matrix().unwrap().reduced_mode(mode).unwrap();
+            for row in 0..direct.dimension() {
+                for column in 0..direct.dimension() {
+                    complex_close(
+                        direct.element(row, column).unwrap(),
+                        via_full.element(row, column).unwrap(),
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn maximum_state_space_rejects_full_density_but_reduces_directly() {
+        let space = FockSpace::try_new(20, 1).unwrap();
+        assert_eq!(space.dimension(), MAX_STATE_DIMENSION);
+        let vacuum = StateVector::vacuum(space);
+        assert!(matches!(
+            vacuum.density_matrix(),
+            Err(QuantumLightError::DensityMatrixTooLarge { .. })
+                | Err(QuantumLightError::DensityMatrixSizeOverflow { .. })
+        ));
+
+        let reduced = vacuum.reduced_mode(0).unwrap();
+        assert_eq!(reduced.dimension(), 2);
+        complex_close(reduced.element(0, 0).unwrap(), Complex64::new(1.0, 0.0));
+        complex_close(reduced.element(0, 1).unwrap(), Complex64::new(0.0, 0.0));
+        complex_close(reduced.element(1, 0).unwrap(), Complex64::new(0.0, 0.0));
+        complex_close(reduced.element(1, 1).unwrap(), Complex64::new(0.0, 0.0));
+    }
+
+    #[test]
+    fn density_matrix_size_check_reports_overflow() {
+        assert_eq!(
+            checked_density_matrix_elements(usize::MAX),
+            Err(QuantumLightError::DensityMatrixSizeOverflow {
+                dimension: usize::MAX
+            })
+        );
     }
 
     #[test]
