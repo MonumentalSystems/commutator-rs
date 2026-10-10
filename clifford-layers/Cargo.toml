@@ -12,6 +12,14 @@ readme = "README.md"
 publish = ["crates-io"]
 keywords = ["clifford-algebra", "geometric-algebra", "neural-network", "convolution"]
 categories = ["mathematics", "science"]
+include = [
+    "src/**/*.rs",
+    "tests/**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md",
+    "LICENSE",
+]
 
 [features]
 default = []

@@ -35,7 +35,8 @@ jobs:
       - run: RUSTDOCFLAGS="-D warnings -D missing-docs" cargo doc --workspace --all-features --no-deps --locked
       - run: sha256sum --check clifford-core/tests/fixtures/clifford-golden-v1.sha256
       - run: sha256sum --check experiment-merkle/tests/fixtures/SHA256SUMS
-      - run: cargo package -p clifford-core -p clifford-field -p clifford-geometry -p clifford-lattice -p clifford-layers -p clifford-mesh -p experiment-core -p experiment-merkle -p harmonic-dynamics --locked
+      - name: Package every publishable crate together
+        run: cargo package --workspace --exclude physics-conformance --locked
 
   msrv:
     name: Rust 1.80

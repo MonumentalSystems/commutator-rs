@@ -70,6 +70,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cluster-embedding"
+version = "0.1.0"
+dependencies = [
+ "cluster-green",
+ "num-complex",
+]
+
+[[package]]
 name = "cluster-green"
 version = "0.1.0"
 dependencies = [
@@ -121,6 +129,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cudarc"
+version = "0.13.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "486c221362668c63a1636cfa51463b09574433b39029326cff40864b3ba12b6e"
+dependencies = [
+ "libloading",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -135,6 +152,17 @@ name = "either"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e9c71c2167ca323c882b99918929403426e2373ea17242ff5653e0d5e1058be"
+
+[[package]]
+name = "experiment-accelerator"
+version = "0.1.0"
+dependencies = [
+ "cudarc",
+ "experiment-core",
+ "serde",
+ "serde_json",
+ "sha2",
+]
 
 [[package]]
 name = "experiment-core"
@@ -182,10 +210,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
+name = "keldysh-green"
+version = "0.1.0"
+dependencies = [
+ "cluster-green",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.190"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce5d3ddc6d3fa000eb1536d85e147bfe31aacaba692ed6a876f95cb7c855be78"
+
+[[package]]
+name = "libloading"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
+dependencies = [
+ "cfg-if",
+ "windows-link",
+]
 
 [[package]]
 name = "majorana-fermions"
@@ -226,6 +271,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "open-quantum-systems"
+version = "0.1.0"
+dependencies = [
+ "num-complex",
+]
+
+[[package]]
+name = "phonon-transport"
+version = "0.1.0"
+dependencies = [
+ "num-complex",
+]
+
+[[package]]
+name = "physics-conformance"
+version = "0.1.0"
+dependencies = [
+ "cluster-embedding",
+ "keldysh-green",
+ "open-quantum-systems",
+ "quantum-shadows",
+ "quantum-tomography",
+ "quantum-transport",
+ "superconducting-dynamics",
+ "superconductivity",
 ]
 
 [[package]]
@@ -270,6 +343,13 @@ dependencies = [
 [[package]]
 name = "quantum-shadows"
 version = "0.1.0"
+
+[[package]]
+name = "quantum-tomography"
+version = "0.1.0"
+dependencies = [
+ "open-quantum-systems",
+]
 
 [[package]]
 name = "quantum-transport"
@@ -386,6 +466,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe895eb47f22e2ddd4dabc02bce419d2e643c8e3b585c78158b349195bc24d82"
 
 [[package]]
+name = "superconducting-dynamics"
+version = "0.1.0"
+dependencies = [
+ "num-complex",
+]
+
+[[package]]
 name = "superconductivity"
 version = "0.1.0"
 dependencies = [
@@ -430,6 +517,12 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "windows-link"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"
 
 [[package]]
 name = "zmij"

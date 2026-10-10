@@ -61,6 +61,38 @@ padding, and tree structure. It proves byte membership only; hosts retain
 responsibility for unpredictable nonces, sampling policy, identity, and
 independent scientific recomputation.
 
+`experiment-accelerator` sits outside that commitment primitive. It owns
+backend descriptors, deterministic partition plans, and differential
+qualification reports that compare an optimized implementation with a
+portable reference. Reports bind work content, worker identity, backend IDs,
+implementation versions, precision, and a versioned policy with explicit
+absolute and relative tolerances. Opaque reports authorize only the exact work,
+worker, backend descriptor, concrete execution fingerprint, and current policy
+checked in-process before and after execution. Separate serialize-only audit
+snapshots expose digests and the policy/comparison as a commitment summary, not
+the raw descriptor, worker, or work preimages, and provide no path back to
+admission authority.
+Host-minted reference authorization separately binds both the approved
+descriptor and concrete execution fingerprint and rechecks them before and
+after direct or differential reference execution.
+The default feature set contains no hardware API, and the crate contains no
+network transport. Neither configuration turns untrusted serialized evidence
+into an admission token.
+
+Its default build remains hardware-neutral. The optional `cuda` feature is the
+one concrete hardware boundary: a checked f64 vector-affine backend performs
+real NVRTC compilation, device transfers, and kernel execution through cudarc,
+then uses the same differential qualification path as external accelerators.
+The committed NVIDIA GB10 record demonstrates that narrow affine contract for
+one documented driver and policy; it includes raw recomputation inputs but is
+unauthenticated until covered by signed release provenance and is not evidence
+for unrelated kernels.
+`ThreadedShardedBackend` is the concrete transport-neutral distributed
+reference: contiguous work is assigned to in-process child workers, child
+seeds are derived deterministically, failures retain shard ordinals, and output
+is reassembled in source order. Network transports can preserve this contract
+without being embedded in the crate.
+
 ## Lattice layer
 
 `clifford-lattice` owns checked pure-f64 Cl⁺(6,0) elements and Spin(6)
@@ -89,13 +121,27 @@ contract and leaves large solvers or deployment concerns outside.
   diagnostics.
 - `quantum-chaos` owns diagnostics over supplied spectra.
 - `quantum-magnetism` owns finite spin-1/2 reference Hamiltonians and
-  observables; `spin-lattice` owns classical magnetoelastic dynamics.
+  observables; `spin-lattice` owns classical magnetoelastic dynamics; and
+  `phonon-transport` owns harmonic-chain and ballistic thermal references.
 - `superconductivity` owns checked BdG assembly and observables;
-  `majorana-fermions` owns sparse Majorana operator algebra.
+  `superconducting-dynamics` owns gauge-covariant TDGL and Josephson dynamics;
+  and `majorana-fermions` owns sparse Majorana operator algebra.
 - `cluster-green` owns cluster Green-function validation and embedding;
-  `quantum-transport` consumes its matrix convention for coherent NEGF.
+  `cluster-embedding` builds solver-injected VCA/DMFT foundations on it;
+  `keldysh-green` reuses its matrices for real-time nonequilibrium Green
+  functions; and `quantum-transport` consumes the same convention for
+  coherent NEGF.
 - `quantum-light` owns bounded photonic Fock states and counting observables;
-  `quantum-shadows` owns local-Pauli measurement reduction.
+  `open-quantum-systems` owns dense Lindblad reference dynamics;
+  `quantum-shadows` owns local-Pauli measurement reduction; and
+  `quantum-tomography` owns state/PTM/Choi reconstruction diagnostics plus
+  gauge-aware sequence models and deterministic small-system reconstruction of
+  explicitly selected GST coordinates. Its reference optimizer is neither
+  CPTP-constrained nor a turnkey production GST system.
+
+`physics-conformance` is a workspace-only consumer of public APIs. It owns no
+scientific implementation and is not released to crates.io; its purpose is to
+detect convention drift across independently publishable packages.
 
 See [`research-suite.md`](research-suite.md) for workflows and non-goals.
 
@@ -105,4 +151,28 @@ A host may connect those layers to SIMD, Metal, CUDA, Accelerate, WebGPU,
 HTTP, databases, identities, or volunteer-worker scheduling. Those
 adapters remain outside the foundational crates so local experiments do not
 inherit operational dependencies.
+
+The allowed dependency direction for the advanced suite is:
+
+```text
+clifford-core
+├── clifford-field / geometry / lattice / layers
+├── harmonic-dynamics
+├── majorana-fermions
+└── clifford-geometry ──> clifford-mesh (optional feature)
+
+cluster-green
+├── cluster-embedding
+├── keldysh-green
+└── quantum-transport
+
+open-quantum-systems ──> quantum-tomography
+experiment-core ───────> experiment-merkle / experiment-accelerator
+
+selected public APIs ──> physics-conformance (workspace-only)
+```
+
+Crates omitted from the arrows are independent at the package level. A
+scientific conversion such as TDGL order parameters to BdG onsite gaps may be
+kept dependency-neutral when a shared scalar/vector boundary is sufficient.
 

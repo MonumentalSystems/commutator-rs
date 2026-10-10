@@ -1,0 +1,24 @@
+[package]
+name = "keldysh-green"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Checked dense reference algorithms for real-time nonequilibrium Green functions"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/keldysh-green"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["keldysh", "green-function", "nonequilibrium", "many-body"]
+categories = ["science", "mathematics"]
+include = [
+    "src/**/*.rs",
+    "tests/**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
+
+[dependencies]
+cluster-green = { version = "0.1.0", path = "../cluster-green" }

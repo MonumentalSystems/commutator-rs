@@ -12,6 +12,14 @@ readme = "README.md"
 publish = ["crates-io"]
 keywords = ["clifford-algebra", "simulation", "physics", "precision"]
 categories = ["mathematics", "science"]
+include = [
+    "src/**/*.rs",
+    "tests/**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "PROVENANCE.md",
+    "LICENSE",
+]
 
 [dependencies]
 clifford-core = { version = "0.1.0", path = "../clifford-core" }

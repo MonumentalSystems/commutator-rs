@@ -12,6 +12,13 @@ readme = "README.md"
 publish = ["crates-io"]
 keywords = ["experiment", "simulation", "distributed-computing", "reproducibility"]
 categories = ["science"]
+include = [
+    "src/**/*.rs",
+    "tests/**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

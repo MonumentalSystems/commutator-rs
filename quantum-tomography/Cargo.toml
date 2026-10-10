@@ -1,0 +1,18 @@
+[package]
+name = "quantum-tomography"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Checked reference state and channel tomography interoperability"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/quantum-tomography"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["quantum", "tomography", "choi", "pauli"]
+categories = ["science", "mathematics"]
+include = ["src/**/*.rs", "tests/**/*.rs", "Cargo.toml", "README.md", "LICENSE"]
+
+[dependencies]
+open-quantum-systems = { version = "0.1.0", path = "../open-quantum-systems" }
