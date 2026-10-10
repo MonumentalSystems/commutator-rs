@@ -80,8 +80,12 @@ that they are already available from crates.io.
 - `quantum-tomography` provides local-Pauli measurement plans, trace-one linear
   inversion, Euclidean PSD trace-one projection, normalized Choi conversion,
   PTM TP/unital/CP checks, and a focused gate-set sequence likelihood and gauge
-  model. It deliberately leaves maximum-likelihood state/channel reconstruction
-  and nonlinear GST optimization to injected specialist solvers.
+  model. Its deterministic small-system GST reference reconstructs explicitly
+  selected coordinates with finite-difference maximum likelihood, checked
+  convergence controls, explicit gauge/chart selection, and optional anchoring.
+  It deliberately leaves maximum-likelihood state/channel reconstruction,
+  CPTP-constrained GST, and turnkey production optimization to injected
+  specialist solvers.
 
 ## Accelerator and distributed validation
 
@@ -92,7 +96,9 @@ that they are already available from crates.io.
 - `experiment-accelerator` describes backend identity, precision,
   determinism, and scheduling requirements; partitions work deterministically;
   and differentially qualifies an optimized backend against a portable
-  reference. It contains no CUDA, Metal, WebGPU, transport, or scheduler.
+  reference. Its default build contains no hardware API, network transport, or
+  scheduler; it also supplies a deterministic in-process sharded reference and
+  an optional CUDA vector-affine validation backend.
 - `physics-conformance` is intentionally not published. It tests cross-crate
   conventions and conversion paths through public APIs inside this workspace.
 
@@ -107,7 +113,10 @@ in-process child workers, suitable as the oracle for a network transport.
 With the optional `cuda` feature, `CudaAffineBackend` performs real f64 device
 execution of a checked vector-affine kernel and is differentially qualified
 against its CPU reference. Hardware evidence belongs under the crate's
-`evidence/` directory and is not itself an admission capability.
+`evidence/` directory and is not itself an admission capability. The committed
+GB10 record captures an accepted zero-error comparison on NVIDIA GB10 with
+driver 580.173.02 for that narrow affine contract; it is not a general hardware
+correctness or performance claim.
 
 ## Interoperability contracts
 
@@ -131,9 +140,10 @@ exclude density-functional electronic structure, a general Hubbard
 exact-diagonalization package, production molecular dynamics, full
 Maxwell/FDTD simulation, production tensor-network solvers, turnkey
 maximum-likelihood/GST optimization, anharmonic phonon Boltzmann transport,
-and hardware kernels. The focused VCA/DMFT, real-time Keldysh, TDGL/Josephson,
-Lindblad, tomography, and harmonic-phonon foundations are present without
-absorbing those mature or application-specific systems.
+and general-purpose hardware kernels beyond the narrow CUDA affine validation
+adapter. The focused VCA/DMFT, real-time Keldysh, TDGL/Josephson, Lindblad,
+tomography, and harmonic-phonon foundations are present without absorbing those
+mature or application-specific systems.
 
 Distributed execution remains separate. Any model can be wrapped in
 `experiment-core` contracts and hosted by Commutator without acquiring HTTP,

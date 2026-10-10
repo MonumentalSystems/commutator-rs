@@ -78,6 +78,8 @@ Its default build remains hardware-neutral. The optional `cuda` feature is the
 one concrete hardware boundary: a checked f64 vector-affine backend performs
 real NVRTC compilation, device transfers, and kernel execution through cudarc,
 then uses the same differential qualification path as external accelerators.
+The committed NVIDIA GB10 record demonstrates that narrow affine contract for
+one documented driver and policy; it is not evidence for unrelated kernels.
 `ThreadedShardedBackend` is the concrete transport-neutral distributed
 reference: contiguous work is assigned to in-process child workers, child
 seeds are derived deterministically, failures retain shard ordinals, and output
@@ -125,8 +127,10 @@ contract and leaves large solvers or deployment concerns outside.
 - `quantum-light` owns bounded photonic Fock states and counting observables;
   `open-quantum-systems` owns dense Lindblad reference dynamics;
   `quantum-shadows` owns local-Pauli measurement reduction; and
-  `quantum-tomography` owns state/PTM/Choi reconstruction diagnostics plus a
-  focused gate-set model.
+  `quantum-tomography` owns state/PTM/Choi reconstruction diagnostics plus
+  gauge-aware sequence models and deterministic small-system reconstruction of
+  explicitly selected GST coordinates. Its reference optimizer is neither
+  CPTP-constrained nor a turnkey production GST system.
 
 `physics-conformance` is a workspace-only consumer of public APIs. It owns no
 scientific implementation and is not released to crates.io; its purpose is to

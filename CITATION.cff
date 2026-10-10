@@ -5,6 +5,8 @@ message: >-
   release links one.
 title: "commutator-rs: Rust foundations for Clifford and computational physics"
 type: software
+version: 0.1.0
+date-released: 2026-10-10
 authors:
   - name: Monumental Systems
 repository-code: "https://github.com/MonumentalSystems/commutator-rs"

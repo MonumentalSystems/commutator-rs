@@ -12,6 +12,16 @@ readme = "README.md"
 publish = ["crates-io"]
 keywords = ["clifford-algebra", "geometric-algebra", "multivector", "rotor"]
 categories = ["mathematics", "science"]
+include = [
+    "src/**/*.rs",
+    "tests/**/*.rs",
+    "tests/fixtures/*.json",
+    "tests/fixtures/*.sha256",
+    "Cargo.toml",
+    "README.md",
+    "CONVENTIONS.md",
+    "LICENSE",
+]
 
 [dev-dependencies]
 serde_json = "1.0"

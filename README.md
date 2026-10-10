@@ -19,7 +19,7 @@ or volunteer-computing backends.
 | [`clifford-layers`](clifford-layers) | Framework-neutral Clifford linear, convolution, normalization, and optional Fourier layers | `clifford-core`, optional RustFFT |
 | [`clifford-mesh`](clifford-mesh) | Checked renderer-independent topology, Euclidean tessellators, and optional CGA adapters | optional `clifford-geometry` |
 | [`experiment-core`](experiment-core) | Transport-neutral work, result, topology, verification, checkpoint-reference, and reproducibility contracts | Serde |
-| [`experiment-accelerator`](experiment-accelerator) | Backend descriptors, deterministic partition plans, and differential qualification of CPU/GPU/distributed experiment adapters | `experiment-core`, Serde, SHA-2 |
+| [`experiment-accelerator`](experiment-accelerator) | Differential backend qualification, deterministic sharded execution, and an optional CUDA vector-affine validation adapter | `experiment-core`, Serde, Serde JSON, SHA-2, optional cudarc |
 | [`experiment-merkle`](experiment-merkle) | Context-bound SHA-256 commitments, inclusion proofs, and deterministic post-commitment spot checks | `experiment-core`, Serde, SHA-2 |
 | [`harmonic-dynamics`](harmonic-dynamics) | Safe `S¹`/Kuramoto, quaternion and sphere geometry, Lohe synchronization, gated scans, and Clifford-compatible Helmholtz sequence fibers | none (Clifford conformance in dev tests) |
 | [`field-lyapunov`](field-lyapunov) | Matrix-free top-k Lyapunov spectra, finite-time estimates, RK4 tangent flow, and chaos diagnostics | none |
@@ -37,7 +37,7 @@ or volunteer-computing backends.
 | [`open-quantum-systems`](open-quantum-systems) | Dense Lindblad reference dynamics, physical density matrices, and fixed-step RK4 | `num-complex` |
 | [`quantum-light`](quantum-light) | Finite Fock states, passive optics, photon statistics, and reduced density matrices | `num-complex` |
 | [`quantum-shadows`](quantum-shadows) | Local-Pauli classical-shadow estimators and robust uncertainty reductions | none |
-| [`quantum-tomography`](quantum-tomography) | Local-Pauli state reconstruction, PTM/Choi channel diagnostics, and focused gate-set likelihood tools | `open-quantum-systems` |
+| [`quantum-tomography`](quantum-tomography) | Local-Pauli state reconstruction, PTM/Choi diagnostics, and checked deterministic small-system GST reconstruction | `open-quantum-systems` |
 
 [`physics-conformance`](physics-conformance) is a non-publishable workspace
 crate. It exercises convention and interoperability boundaries across the
@@ -136,9 +136,11 @@ The algebra conventions and golden vectors are versioned in
 ## Status
 
 The crates are pre-1.0 and their APIs are being prepared for their first
-crates.io releases. The portable CPU implementations and conformance fixtures
-are the reference surface; optimized backends remain host-side adapters until
-their differential tests are equally strong.
+crates.io releases. Portable CPU implementations and conformance fixtures remain
+the reference surface. `experiment-accelerator` includes one narrow optional
+CUDA affine adapter with committed GB10 qualification evidence; broader
+optimized backends remain host-side adapters until their differential tests are
+equally strong.
 
 ## Contributing
 
