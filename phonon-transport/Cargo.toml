@@ -1,0 +1,18 @@
+[package]
+name = "phonon-transport"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Checked harmonic-chain phonons and ballistic thermal transport"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/phonon-transport"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["phonon", "thermal", "materials", "lattice-dynamics"]
+categories = ["science", "simulation", "mathematics"]
+include = ["src/**/*.rs", "tests/**/*.rs", "Cargo.toml", "README.md", "LICENSE"]
+
+[dependencies]
+num-complex = "0.4"
