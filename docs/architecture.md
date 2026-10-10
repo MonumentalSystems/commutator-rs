@@ -32,6 +32,14 @@ Clifford linear, convolution, normalization, and optional Fourier layers. It
 depends only on `clifford-core`, plus optional RustFFT support, and contains no
 training runtime, model, networking, or accelerator integration.
 
+## Mesh layer
+
+`clifford-mesh` owns checked renderer-independent point, indexed-line, and
+indexed-triangle buffers plus bounded Euclidean primitive tessellators. It is
+independent of graphics runtimes and algebra representations. CGA adapters are
+deferred until `clifford-geometry` exposes checked semantic decomposition APIs;
+the mesh crate does not decode sparse blade positions itself.
+
 ## Experiment layer
 
 `experiment-core` owns typed descriptions of work and results, topology,
