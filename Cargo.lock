@@ -65,6 +65,9 @@ dependencies = [
 [[package]]
 name = "clifford-mesh"
 version = "0.1.0"
+dependencies = [
+ "clifford-geometry",
+]
 
 [[package]]
 name = "cpufeatures"

@@ -21,4 +21,12 @@ include = [
     "LICENSE",
 ]
 
+[package.metadata.docs.rs]
+features = ["cga3d"]
+
+[features]
+default = []
+cga3d = ["dep:clifford-geometry"]
+
 [dependencies]
+clifford-geometry = { version = "0.1.0", path = "../clifford-geometry", optional = true }

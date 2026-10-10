@@ -13,10 +13,12 @@ The public v0.1 API deliberately changes the source design:
 - UV spheres use unique poles rather than degenerate pole quads;
 - the source CGA circle, line, and plane decoders are not included.
 
-Those CGA adapters remain deferred pending conformance tests for translated
-circle extraction, homogeneous line scaling, and direct-line layout in
-`clifford-geometry`. This crate does not claim parity with C++ Versor's
-visualization layer.
+The optional `cga3d` adapters are new composition over the checked point and
+real-dual-sphere decomposition API in `clifford-geometry`; they do not preserve
+the source module's tolerance-based classification, imaginary-radius absolute
+value, or fabricated tiny spheres. Circle, line, and plane adapters remain
+deferred pending semantic decomposition and conformance tests. This crate does
+not claim parity with C++ Versor's visualization layer.
 
 The extracted and redesigned implementation retains the upstream BSD-2-Clause
 license and attribution.

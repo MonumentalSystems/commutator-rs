@@ -8,6 +8,10 @@ mod math;
 mod mesh;
 mod options;
 
+/// Checked adapters from conformal geometric-algebra values to mesh inputs.
+#[cfg(feature = "cga3d")]
+pub mod cga3d;
+
 /// Checked Euclidean tessellation functions.
 pub mod primitives;
 
