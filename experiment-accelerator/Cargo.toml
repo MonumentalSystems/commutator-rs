@@ -1,0 +1,21 @@
+[package]
+name = "experiment-accelerator"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Validated accelerator and distributed-work adapters for experiment-core"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/experiment-accelerator"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["gpu", "distributed", "experiment", "simulation"]
+categories = ["science", "concurrency"]
+include = ["src/**/*.rs", "tests/**/*.rs", "Cargo.toml", "README.md", "LICENSE"]
+
+[dependencies]
+experiment-core = { version = "0.1.0", path = "../experiment-core" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
