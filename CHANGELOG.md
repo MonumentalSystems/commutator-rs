@@ -27,4 +27,7 @@ is versioned independently; release headings include the crate name.
   vortex initializers to `clifford-field` without coupling them to experiment
   presets or timestep selection. Initializers never select or change boundary
   policy; the lone-vortex initializer rejects periodic topology.
+- Add typed `S¹` phases, circular order parameters, and checked all-to-all
+  Kuramoto Euler dynamics to `harmonic-dynamics`, including natural-frequency
+  drift for uncoupled and single-oscillator systems.
 

@@ -3,14 +3,14 @@ name = "harmonic-dynamics"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
-description = "Safe quaternion, spherical Lohe, and harmonic sequence dynamics"
+description = "Safe Kuramoto, quaternion, spherical Lohe, and harmonic sequence dynamics"
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 documentation = "https://docs.rs/harmonic-dynamics"
 readme = "README.md"
 publish = ["crates-io"]
-keywords = ["quaternion", "lohe", "sphere", "dynamics", "signal-processing"]
+keywords = ["kuramoto", "quaternion", "lohe", "sphere", "dynamics"]
 categories = ["mathematics", "science"]
 include = [
     "src/**/*.rs",
