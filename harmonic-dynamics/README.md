@@ -1,8 +1,9 @@
 # harmonic-dynamics
 
 `harmonic-dynamics` is a dependency-free collection of safe numerical kernels
-for unit-quaternion geometry, spherical interpolation, Lohe mean-field
-synchronization, gated sequence scans, and multi-head Helmholtz fibers.
+for circle phases, Kuramoto synchronization, unit-quaternion geometry,
+spherical interpolation, Lohe mean-field synchronization, gated sequence
+scans, and multi-head Helmholtz fibers.
 
 The crate deliberately contains no neural-network framework integration,
 model configuration, diagnostics, unsafe code, or platform-specific SIMD.
@@ -21,8 +22,24 @@ assert!((z.norm() - 1.0).abs() < 1e-6);
 # Ok::<(), harmonic_dynamics::DynamicsError>(())
 ```
 
+The Kuramoto kernel uses typed, canonically wrapped phases and a checked
+all-to-all mean-field Euler step:
+
+```rust
+use harmonic_dynamics::kuramoto::{order_parameter, MeanFieldKuramoto, Phase};
+
+let model = MeanFieldKuramoto::try_new(2.0, 0.01)?;
+let mut phases = [Phase::from_radians(0.0)?, Phase::from_radians(1.0)?];
+for _ in 0..100 {
+    model.step_euler(&mut phases, &[0.2, 0.2])?;
+}
+assert!(order_parameter(&phases)?.coherence() > 0.9);
+# Ok::<(), harmonic_dynamics::DynamicsError>(())
+```
+
 ## Modules
 
+- `kuramoto`: typed `S¹` phases, circular order, and all-to-all Euler dynamics
 - `quaternion`: typed Hamilton algebra and maps on `S^3`
 - `sphere`: dimension-checked operations on `S^(d-1)`
 - `lohe`: real, quaternion, and phase-shifted Lohe synchronization
@@ -37,6 +54,12 @@ paths, and use exponential-map sphere steps. These choices intentionally
 differ from HarmonicRust paths that normalize the mean direction or use a
 first-order Euler update. Stable direct recurrences likewise replace the
 source's inverse-power scan formulas.
+
+Kuramoto phases use the canonical interval `[-pi, pi)`. The public step keeps
+the source's synchronous `K/N` complete-graph equation while applying natural
+frequency drift when `K = 0` or `N = 1`, cases the private population wrapper
+incorrectly froze. Mean direction is reported as undefined near zero
+coherence. Explicit Euler stability remains the caller's responsibility.
 
 ## Provenance
 

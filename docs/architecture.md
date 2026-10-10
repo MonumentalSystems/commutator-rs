@@ -69,11 +69,12 @@ have one validated numerical contract.
 
 ## Harmonic dynamics
 
-`harmonic-dynamics` owns dependency-free quaternion and sphere geometry,
-Lohe mean-field synchronization, stable gated recurrences, and multi-head
-Helmholtz sequence fibers. It is a portable numerical reference crate: neural
-network frameworks, model configuration, serialization, accelerator kernels,
-and distributed execution remain outside its boundary.
+`harmonic-dynamics` owns dependency-free typed circle phases, complete-graph
+Kuramoto dynamics, quaternion and sphere geometry, Lohe mean-field
+synchronization, stable gated recurrences, and multi-head Helmholtz sequence
+fibers. It is a portable numerical reference crate: neural-network frameworks,
+model configuration, serialization, accelerator kernels, and distributed
+execution remain outside its boundary.
 
 ## Host adapters
 

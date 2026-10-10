@@ -20,7 +20,7 @@ or volunteer-computing backends.
 | [`clifford-mesh`](clifford-mesh) | Checked renderer-independent triangle, line, and point topology with Euclidean primitive tessellators | none |
 | [`experiment-core`](experiment-core) | Transport-neutral work, result, topology, verification, checkpoint-reference, and reproducibility contracts | Serde |
 | [`experiment-merkle`](experiment-merkle) | Context-bound SHA-256 commitments, inclusion proofs, and deterministic post-commitment spot checks | `experiment-core`, Serde, SHA-2 |
-| [`harmonic-dynamics`](harmonic-dynamics) | Safe quaternion and sphere geometry, Lohe synchronization, gated scans, and Helmholtz sequence fibers | none |
+| [`harmonic-dynamics`](harmonic-dynamics) | Safe `S¹`/Kuramoto, quaternion and sphere geometry, Lohe synchronization, gated scans, and Helmholtz sequence fibers | none |
 
 The foundational crates deliberately do not contain HTTP, databases, identity,
 scheduling, or a particular scientific model. Those capabilities belong in

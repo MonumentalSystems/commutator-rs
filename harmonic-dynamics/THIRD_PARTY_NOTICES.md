@@ -5,6 +5,17 @@ Helmholtz-fiber formulas in this crate were extracted and reworked from
 HarmonicRust, commit
 `c20fd04956f987f9a00d53c78728d8069f0a1589`.
 
+The `S¹` phase, circular order-parameter, and complete-graph Kuramoto formulas
+were generalized from
+`harmonic-core/src/symbiogenesis/kuramoto.rs` at that commit (SHA-256
+`19141dcfa0d01fcfc3f2f50109be7fdb6cebcb8c67622ee5720b50b94693ee3b`).
+The linear-time mean-phasor identity was cross-checked against
+`harmonic-core/src/attention/resonance.rs` at the same commit. The public API
+removes architecture hashing, population IDs, missing-ID fallbacks, fusion,
+and training controls. It also corrects the source behavior that suppressed
+natural-frequency drift when coupling was zero or only one oscillator was
+active.
+
 The pinned HarmonicRust repository declares MIT licensing in its workspace
 manifest and README. It does not carry a separate copyright attribution in
 those files, so none is invented here. The crate's `LICENSE` contains the MIT
