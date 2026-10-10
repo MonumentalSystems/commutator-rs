@@ -12,10 +12,27 @@ readme = "README.md"
 publish = ["crates-io"]
 keywords = ["gpu", "distributed", "experiment", "simulation"]
 categories = ["science", "concurrency"]
-include = ["src/**/*.rs", "tests/**/*.rs", "Cargo.toml", "README.md", "LICENSE"]
+include = [
+    "src/**/*.rs",
+    "tests/**/*.rs",
+    "examples/**/*.rs",
+    "evidence/*.json",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
+
+[features]
+default = []
+cuda = ["dep:cudarc"]
 
 [dependencies]
 experiment-core = { version = "0.1.0", path = "../experiment-core" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
+cudarc = { version = "=0.13.9", optional = true, default-features = false, features = ["std", "driver", "nvrtc", "cuda-12080"] }
+
+[[example]]
+name = "cuda_validate"
+required-features = ["cuda"]

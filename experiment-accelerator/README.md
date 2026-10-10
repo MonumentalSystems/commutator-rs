@@ -12,9 +12,9 @@ The crate keeps three concerns explicit:
   backend before results are admitted to a distributed experiment.
 
 It also supplies deterministic independent-replica and contiguous range plans.
-There is no dependency on CUDA, Metal, WebGPU, an async runtime, or a network
-transport. Hardware crates implement `ComputeBackend` and use the same
-validation harness in their own CI or startup qualification.
+The default feature set has no dependency on CUDA, Metal, WebGPU, an async
+runtime, or a network transport. Hardware crates can implement `ComputeBackend`
+and use the same validation harness in their own CI or startup qualification.
 Accepted qualification reports are constructible only by the differential
 check API and are bound to the serialized work unit, worker identity, backend
 descriptors, and an explicit versioned policy with absolute and relative error
@@ -56,3 +56,36 @@ authorization from a trusted reference allowlist after restart. Audit evidence
 cannot recreate an admission capability.
 Work binding uses domain-separated SHA-256 over recursively key-sorted canonical
 JSON; payload types therefore need stable Serde value semantics.
+
+## Concrete adapters
+
+`ThreadedShardedBackend<B, W, R>` is a deterministically scheduled,
+transport-neutral distributed reference. It assigns at most one contiguous shard to each child backend,
+derives a stable per-shard seed, executes children on scoped threads, checks
+each result length, namespaces child metrics, and rejoins results in input order
+regardless of completion order. A child error or panic identifies its stable
+shard ordinal and rejects the whole result. Its descriptor derives determinism,
+precision, numeric requirements, and exact labels from the child descriptors;
+mixed precision is reported honestly and conflicting child labels are rejected.
+
+The optional `cuda` feature provides `CudaAffineBackend`, a real f64 CUDA
+backend for the checked `AffineVectorWork` contract. It uses cudarc/NVRTC to
+compile and launch an embedded `scale * x + bias` kernel and can be qualified
+against `AffineCpuBackend` through the same policy-bound differential API:
+
+```bash
+cargo test -p experiment-accelerator --all-targets --all-features
+cargo test -p experiment-accelerator --features cuda --test cuda_hardware \
+  -- --ignored --nocapture
+NVIDIA_DRIVER_VERSION=580.173.02 \
+  cargo run -p experiment-accelerator --features cuda --example cuda_validate
+```
+
+CUDA is optional and dynamically loaded; default builds remain portable. The
+embedded launch contains one narrowly documented unsafe boundary because CUDA
+kernel argument signatures cannot be checked by Rust. The checked buffer
+length, element type, context ownership, and kernel signature are kept together
+at that boundary.
+
+The committed GB10 validation record is
+[`evidence/cuda-gb10-driver-580.173.02.json`](evidence/cuda-gb10-driver-580.173.02.json).

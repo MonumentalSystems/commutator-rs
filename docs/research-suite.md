@@ -101,6 +101,14 @@ work. It does not itself claim that any hardware implementation is correct or
 deterministic; each backend must publish its own qualification evidence,
 precision, reduction order, implementation version, and tolerance.
 
+`experiment-accelerator` includes two executable reference boundaries for that
+policy. `ThreadedShardedBackend` provides deterministic ordered sharding across
+in-process child workers, suitable as the oracle for a network transport.
+With the optional `cuda` feature, `CudaAffineBackend` performs real f64 device
+execution of a checked vector-affine kernel and is differentially qualified
+against its CPU reference. Hardware evidence belongs under the crate's
+`evidence/` directory and is not itself an admission capability.
+
 ## Interoperability contracts
 
 Quantum and Green-function crates expose `num_complex::Complex64` or re-export

@@ -1,0 +1,61 @@
+{
+  "backend": {
+    "deterministic": true,
+    "id": "affine-cuda",
+    "implementation_version": "kernel-v1",
+    "kind": "gpu",
+    "precision": "f64",
+    "required_labels": {
+      "gpu.api": "cuda"
+    },
+    "requirements": [
+      {
+        "min_value": 1.0,
+        "name": "gpu.available"
+      }
+    ]
+  },
+  "compute_capability": "12.1",
+  "cuda_api_bindings": "12.8",
+  "cudarc_version": "0.13.9",
+  "gpu_name": "NVIDIA GB10",
+  "gpu_ordinal": 0,
+  "nvidia_driver": "580.173.02",
+  "policy": {
+    "absolute_tolerance": 1e-14,
+    "id": "f64-affine",
+    "relative_tolerance": 1e-14,
+    "version": "v1"
+  },
+  "qualification": {
+    "candidate_backend": "affine-cuda",
+    "candidate_descriptor_sha256": "f25f62aba032efe48414b740ce9a168a508a9f2a1659c10abdb9b3dc18f29d08",
+    "candidate_version": "kernel-v1",
+    "comparison": {
+      "accepted": true,
+      "max_absolute_error": 0.0,
+      "max_relative_error": 0.0
+    },
+    "experiment_id": "cuda-affine",
+    "generation": 0,
+    "instance_id": "hardware",
+    "policy": {
+      "absolute_tolerance": 1e-14,
+      "id": "f64-affine",
+      "relative_tolerance": 1e-14,
+      "version": "v1"
+    },
+    "policy_sha256": "570787869674b56040e623e3e35b4d834fb4c4a7ab5a35f06bc25ef06dc5a2cb",
+    "reference_backend": "affine-cpu",
+    "reference_descriptor_sha256": "826cd3b252bdbd87776fa0aa9c321a29533a3f08273b56454d73f3d0a56f49bd",
+    "reference_version": "kernel-v1",
+    "schema": "commutator.accelerator-qualification.v1",
+    "schema_version": 1,
+    "seed": 17,
+    "unit_id": "replica-0000000000000000",
+    "work_sha256": "43bf3d2d52cc18f7f97c7736c8f6144ae92e30e4c965908795b4e7fbcf53b835",
+    "worker_id": "cuda-hardware-validation",
+    "worker_sha256": "4d6a4a8133b828d7f7905558a23e82e65a15f89007891cc5619c3e06d4e2eb4d"
+  },
+  "schema": "commutator.cuda-validation.v1"
+}

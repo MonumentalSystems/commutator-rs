@@ -70,8 +70,19 @@ absolute and relative tolerances. Opaque reports authorize only the exact work,
 worker, backend descriptor, and current policy checked in-process. Separate
 serialize-only audit snapshots expose full descriptor, worker, work, policy,
 and comparison evidence without providing a path back to admission authority.
-The crate contains no hardware API or network transport and does not turn
-untrusted serialized evidence into an admission token.
+The default feature set contains no hardware API, and the crate contains no
+network transport. Neither configuration turns untrusted serialized evidence
+into an admission token.
+
+Its default build remains hardware-neutral. The optional `cuda` feature is the
+one concrete hardware boundary: a checked f64 vector-affine backend performs
+real NVRTC compilation, device transfers, and kernel execution through cudarc,
+then uses the same differential qualification path as external accelerators.
+`ThreadedShardedBackend` is the concrete transport-neutral distributed
+reference: contiguous work is assigned to in-process child workers, child
+seeds are derived deterministically, failures retain shard ordinals, and output
+is reassembled in source order. Network transports can preserve this contract
+without being embedded in the crate.
 
 ## Lattice layer
 

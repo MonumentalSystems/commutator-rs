@@ -1,7 +1,13 @@
 //! Validated accelerator and distributed-work adapters for `experiment-core`.
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
+#![deny(unsafe_op_in_unsafe_fn)]
 #![warn(missing_docs)]
+
+mod affine;
+#[cfg(feature = "cuda")]
+mod cuda;
+mod sharded;
 
 use core::fmt;
 use std::collections::BTreeMap;
@@ -9,6 +15,11 @@ use std::collections::BTreeMap;
 pub use experiment_core::{RunMetadata, WorkResult, WorkUnit, WorkerCapability, WorkerContext};
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
+
+pub use affine::{AffineCpuBackend, AffineError, AffineVectorWork};
+#[cfg(feature = "cuda")]
+pub use cuda::{CudaAffineBackend, CudaAffineError};
+pub use sharded::{shard_seed, ShardedError, ThreadedShardedBackend};
 
 /// Errors returned while constructing or applying experiment adapters.
 #[derive(Clone, Debug, PartialEq, Eq)]
