@@ -13,14 +13,15 @@ The public v0.1 API deliberately changes the source design:
 - UV spheres use unique poles rather than degenerate pole quads;
 - the source CGA circle, line, and plane decoders are not included.
 
-The optional `cga3d` adapters are new composition over the checked point and
-real-dual-sphere decomposition API in `clifford-geometry`; they do not preserve
-the source module's tolerance-based classification, imaginary-radius absolute
-value, or fabricated tiny spheres. Circle, line, and plane adapters remain
-outside the current API; checked plane decomposition now exists in
-`clifford-geometry`, while circle and line decomposition still require
-conformance work. This crate does not claim parity with C++ Versor's
-visualization layer.
+The optional `cga3d` adapters are new composition over the checked point,
+real-dual-sphere, direct-plane, and compact-dual-plane decomposition APIs in
+`clifford-geometry`; they do not reuse the source decoders or preserve the
+source module's tolerance-based classification, imaginary-radius absolute
+value, fabricated tiny spheres, or translated-plane sign bug. Plane adapters
+preserve the checked decomposition's offsets and representative orientation.
+Circle and line adapters remain outside the current API pending matching
+semantic decomposition work. This crate does not claim parity with C++
+Versor's visualization layer.
 
 The extracted and redesigned implementation retains the upstream BSD-2-Clause
 license and attribution.

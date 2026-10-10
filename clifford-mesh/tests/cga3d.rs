@@ -5,9 +5,172 @@ use std::error::Error;
 use clifford_geometry::cga3d::decomposition::DecompositionError;
 use clifford_geometry::cga3d::{point, Round};
 use clifford_geometry::mvec::Multivector;
-use clifford_mesh::cga3d::{point_cloud, real_dual_sphere, CgaMeshError};
-use clifford_mesh::primitives::{icosphere, uv_sphere};
-use clifford_mesh::{IcosphereOptions, MeshError, UvSphereOptions};
+use clifford_mesh::cga3d::{direct_plane, dual_plane, point_cloud, real_dual_sphere, CgaMeshError};
+use clifford_mesh::primitives::{
+    icosphere, plane_grid, plane_normal_indicator, plane_patch, uv_sphere,
+};
+use clifford_mesh::{IcosphereOptions, MeshError, PlanePatchOptions, UvSphereOptions};
+
+fn assert_vec3_close(actual: [f32; 3], expected: [f32; 3], tolerance: f32) {
+    for axis in 0..3 {
+        assert!(
+            (actual[axis] - expected[axis]).abs() <= tolerance,
+            "axis {axis}: expected {}, got {}",
+            expected[axis],
+            actual[axis]
+        );
+    }
+}
+
+fn subtract(left: [f32; 3], right: [f32; 3]) -> [f32; 3] {
+    core::array::from_fn(|axis| left[axis] - right[axis])
+}
+
+fn dot(left: [f32; 3], right: [f32; 3]) -> f32 {
+    left.iter().zip(right).map(|(a, b)| a * b).sum()
+}
+
+fn cross(left: [f32; 3], right: [f32; 3]) -> [f32; 3] {
+    [
+        left[1] * right[2] - left[2] * right[1],
+        left[2] * right[0] - left[0] * right[2],
+        left[0] * right[1] - left[1] * right[0],
+    ]
+}
+
+#[test]
+fn direct_and_compact_dual_planes_produce_the_same_descriptor() {
+    let direct = Multivector::new([-7.0, 6.0, 3.0, 2.0]);
+    let dual = Multivector::new([2.0, -3.0, 6.0, -7.0]);
+    let expected_normal = [2.0 / 7.0, -3.0 / 7.0, 6.0 / 7.0];
+
+    let direct_descriptor = direct_plane(&direct).unwrap();
+    let dual_descriptor = dual_plane(&dual).unwrap();
+    assert_eq!(direct_descriptor, dual_descriptor);
+    assert_vec3_close(direct_descriptor.point(), expected_normal, f32::EPSILON);
+    assert_vec3_close(direct_descriptor.normal(), expected_normal, f32::EPSILON);
+}
+
+#[test]
+fn direct_plane_preserves_translated_carrier_sign_and_composes_with_tessellators() {
+    let descriptor = direct_plane(&Multivector::new([24.0, -8.0, 0.0, 0.0])).unwrap();
+    assert_eq!(descriptor.point(), [0.0, 0.0, 3.0]);
+    assert_eq!(descriptor.normal(), [0.0, 0.0, -1.0]);
+
+    let options = PlanePatchOptions::new(5, 7).unwrap();
+    let patch = plane_patch(&descriptor, 4.0, options).unwrap();
+    assert_eq!(patch.vertices().len(), 48);
+    assert_eq!(patch.triangle_count(), 70);
+    for vertex in patch.vertices() {
+        assert!(
+            dot(
+                subtract(vertex.position(), descriptor.point()),
+                descriptor.normal()
+            )
+            .abs()
+                < 1e-5
+        );
+        assert_eq!(vertex.normal(), descriptor.normal());
+    }
+    for triangle in patch.triangles() {
+        let [a, b, c] = triangle.map(|index| patch.vertices()[index as usize].position());
+        let geometric_normal = cross(subtract(b, a), subtract(c, a));
+        assert!(dot(geometric_normal, descriptor.normal()) > 0.0);
+    }
+
+    let grid = plane_grid(&descriptor, 4.0, options).unwrap();
+    assert_eq!(grid.segments().len(), 14);
+    assert_eq!(grid.positions().len(), 28);
+    for position in grid.positions() {
+        assert!(dot(subtract(*position, descriptor.point()), descriptor.normal()).abs() < 1e-5);
+    }
+
+    let indicator = plane_normal_indicator(&descriptor, 2.0).unwrap();
+    assert_eq!(indicator.segments(), &[[0, 1]]);
+    assert_eq!(indicator.positions(), &[[0.0, 0.0, 3.0], [0.0, 0.0, 1.0]]);
+}
+
+#[test]
+fn negative_plane_scale_preserves_locus_and_reverses_orientation() {
+    let dual = Multivector::new([2.0, -3.0, 6.0, -7.0]);
+    let direct = Multivector::new([-7.0, 6.0, 3.0, 2.0]);
+    let forward = dual_plane(&dual).unwrap();
+    let reversed = dual_plane(&(dual * -8.0)).unwrap();
+    assert_eq!(dual_plane(&(dual * 65_536.0)).unwrap(), forward);
+    assert_eq!(direct_plane(&(direct * 65_536.0)).unwrap(), forward);
+    assert_eq!(direct_plane(&(direct * -8.0)).unwrap(), reversed);
+    assert_eq!(reversed.point(), forward.point());
+    assert_vec3_close(
+        reversed.normal(),
+        forward.normal().map(|value| -value),
+        f32::EPSILON,
+    );
+
+    let options = PlanePatchOptions::new(3, 4).unwrap();
+    for descriptor in [forward, reversed] {
+        let patch = plane_patch(&descriptor, 2.0, options).unwrap();
+        for vertex in patch.vertices() {
+            assert!(
+                dot(
+                    subtract(vertex.position(), forward.point()),
+                    forward.normal()
+                )
+                .abs()
+                    < 2e-6
+            );
+            assert_eq!(vertex.normal(), descriptor.normal());
+        }
+        for triangle in patch.triangles() {
+            let [a, b, c] = triangle.map(|index| patch.vertices()[index as usize].position());
+            assert!(dot(cross(subtract(b, a), subtract(c, a)), descriptor.normal()) > 0.0);
+        }
+        let indicator = plane_normal_indicator(&descriptor, 2.0).unwrap();
+        assert_vec3_close(
+            subtract(indicator.positions()[1], indicator.positions()[0]),
+            descriptor.normal().map(|value| value * 2.0),
+            2e-6,
+        );
+    }
+}
+
+#[test]
+fn malformed_planes_preserve_representation_specific_errors() {
+    let subnormal = f32::from_bits(1);
+    let cases = [
+        (
+            dual_plane(&Multivector::new([0.0, 0.0, 0.0, 1.0])),
+            CgaMeshError::DualPlaneDecomposition(DecompositionError::DegeneratePlaneNormal),
+        ),
+        (
+            direct_plane(&Multivector::new([1.0, 0.0, 0.0, 0.0])),
+            CgaMeshError::DirectPlaneDecomposition(DecompositionError::DegeneratePlaneNormal),
+        ),
+        (
+            dual_plane(&Multivector::new([f32::INFINITY, 0.0, 0.0, 1.0])),
+            CgaMeshError::DualPlaneDecomposition(DecompositionError::NonFiniteInput),
+        ),
+        (
+            direct_plane(&Multivector::new([f32::NAN, 0.0, 0.0, 1.0])),
+            CgaMeshError::DirectPlaneDecomposition(DecompositionError::NonFiniteInput),
+        ),
+        (
+            dual_plane(&Multivector::new([subnormal, 0.0, 0.0, f32::MAX])),
+            CgaMeshError::DualPlaneDecomposition(DecompositionError::OutputOutOfRange),
+        ),
+        (
+            direct_plane(&Multivector::new([f32::MAX, 0.0, 0.0, subnormal])),
+            CgaMeshError::DirectPlaneDecomposition(DecompositionError::OutputOutOfRange),
+        ),
+    ];
+    for (actual, expected) in cases {
+        let error = actual.unwrap_err();
+        assert_eq!(error, expected);
+        assert_eq!(
+            error.source().unwrap().to_string(),
+            expected.source().unwrap().to_string()
+        );
+    }
+}
 
 #[test]
 fn real_dual_sphere_composes_with_existing_tessellators() {
