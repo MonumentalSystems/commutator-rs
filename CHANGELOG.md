@@ -20,4 +20,7 @@ is versioned independently; release headings include the crate name.
   checks in `experiment-merkle`.
 - Extract explicit mesh topology and corrected, bounded Euclidean tessellators
   into the renderer-independent `clifford-mesh` crate.
+- Add checked CGA point and real dual-sphere decomposition to
+  `clifford-geometry`, including homogeneous normalization when the scaled
+  `f32` coefficients retain the represented semantics.
 

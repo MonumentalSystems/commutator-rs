@@ -12,6 +12,9 @@
 //!
 //! Types follow the original Versor library naming conventions.
 
+/// Checked semantic decomposition of conformal points and dual spheres.
+pub mod decomposition;
+
 use crate::mvec::Multivector;
 use crate::products::{self, DenseTable};
 use std::sync::OnceLock;
@@ -612,7 +615,13 @@ impl Round {
         point(x, y, z)
     }
 
-    /// Create a dual sphere from a center point and radius.
+    /// Create a dual sphere from a canonical, weight-one center point and radius.
+    ///
+    /// This legacy constructor preserves the original Versor API and does not
+    /// validate point semantics or homogeneous weight. When a center crosses
+    /// an untrusted or serialized boundary, decompose it with
+    /// [`decomposition::decompose_point`] and rebuild a canonical center with
+    /// [`point`] before calling this constructor.
     /// Dls = P - 0.5 * r^2 * ninf
     /// Since ninf = e4 + e5, we subtract 0.5*r^2 from both e4 and e5 components.
     pub fn dls(center: &Pnt, radius: f32) -> Dls {
@@ -627,6 +636,10 @@ impl Round {
     }
 
     /// Extract the Euclidean center point from a dual sphere / point.
+    ///
+    /// This is a legacy unchecked helper: a value with
+    /// `abs(e5 - e4) < 1e-10` is returned unchanged. New boundary-facing code
+    /// should use [`decomposition::decompose_real_dual_sphere`].
     /// Center = Dls * ninf * Dls  (sandwich of ninf by Dls, then normalize).
     /// But simpler: divide Euclidean components by the weight.
     ///
@@ -673,6 +686,11 @@ impl Round {
     }
 
     /// Squared radius of a dual sphere.
+    ///
+    /// This legacy unchecked helper returns zero when the squared homogeneous
+    /// weight is below `1e-20` and may return a negative value for an imaginary
+    /// sphere. New boundary-facing code should use
+    /// [`decomposition::decompose_real_dual_sphere`].
     pub fn radius_squared(dls: &Dls) -> f32 {
         let sq =
             dls[0] * dls[0] + dls[1] * dls[1] + dls[2] * dls[2] + dls[3] * dls[3] - dls[4] * dls[4];
@@ -685,6 +703,11 @@ impl Round {
     }
 
     /// Extract Euclidean location from a point.
+    ///
+    /// This is a legacy unchecked helper: a value with
+    /// `abs(e5 - e4) < 1e-10` falls back to its first three coefficients, and
+    /// nullness is not validated. New boundary-facing code should use
+    /// [`decomposition::decompose_point`].
     pub fn location(p: &Pnt) -> (f32, f32, f32) {
         let weight = p[4] - p[3];
         if weight.abs() < 1e-10 {
