@@ -14,7 +14,6 @@ pub use num_complex::Complex64;
 
 const MAX_STATE_DIMENSION: usize = 1 << 20;
 const MAX_OCCUPATION: usize = 64;
-const NORMALIZATION_TOLERANCE: f64 = 1.0e-12;
 
 /// Errors returned by checked quantum-light kernels.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -292,7 +291,7 @@ impl StateVector {
         if !norm_squared.is_finite() {
             return Err(QuantumLightError::NonFiniteInput);
         }
-        if norm_squared <= NORMALIZATION_TOLERANCE {
+        if norm_squared == 0.0 {
             return Err(QuantumLightError::ZeroNorm);
         }
         let inverse_norm = norm_squared.sqrt().recip();
@@ -358,7 +357,7 @@ impl StateVector {
     pub fn creation_would_truncate(&self, mode: usize) -> Result<bool> {
         self.space.check_mode(mode)?;
         for (index, amplitude) in self.amplitudes.iter().enumerate() {
-            if amplitude.norm_sqr() > NORMALIZATION_TOLERANCE
+            if amplitude.norm_sqr() != 0.0
                 && self.space.occupations(index)?[mode] == self.space.max_occupation
             {
                 return Ok(true);
@@ -393,7 +392,7 @@ impl StateVector {
             return Err(QuantumLightError::NonFiniteInput);
         }
         for (index, amplitude) in self.amplitudes.iter().enumerate() {
-            if amplitude.norm_sqr() <= NORMALIZATION_TOLERANCE {
+            if amplitude.norm_sqr() == 0.0 {
                 continue;
             }
             let occupations = self.space.occupations(index)?;
@@ -410,7 +409,7 @@ impl StateVector {
         let sine = theta.sin();
         let mut output = vec![Complex64::new(0.0, 0.0); self.space.dimension];
         for (index, &amplitude) in self.amplitudes.iter().enumerate() {
-            if amplitude.norm_sqr() <= NORMALIZATION_TOLERANCE {
+            if amplitude.norm_sqr() == 0.0 {
                 continue;
             }
             let mut occupations = self.space.occupations(index)?;
@@ -465,7 +464,7 @@ impl StateVector {
             .enumerate()
             .map(|(n, probability)| n as f64 * probability)
             .sum();
-        if mean <= NORMALIZATION_TOLERANCE {
+        if mean == 0.0 {
             return Ok(None);
         }
         let factorial_moment: f64 = distribution
@@ -511,7 +510,7 @@ impl StateVector {
         let norm = self.norm_squared();
         if !norm.is_finite() {
             Err(QuantumLightError::NonFiniteInput)
-        } else if norm <= NORMALIZATION_TOLERANCE {
+        } else if norm == 0.0 {
             Err(QuantumLightError::ZeroNorm)
         } else {
             Ok(norm)
@@ -787,5 +786,18 @@ mod tests {
             StateVector::two_mode_squeezed(space, 0, 1, 1.0),
             Err(QuantumLightError::InvalidSqueezing)
         );
+    }
+
+    #[test]
+    fn small_nonzero_amplitudes_are_not_silently_discarded() {
+        let space = FockSpace::try_new(1, 1).unwrap();
+        let state = StateVector::try_from_amplitudes(
+            space,
+            vec![Complex64::new(0.0, 0.0), Complex64::new(1.0e-100, 0.0)],
+        )
+        .unwrap();
+        let normalized = state.normalized().unwrap();
+        close(normalized.probability(&[1]).unwrap(), 1.0);
+        assert!(state.creation_would_truncate(0).unwrap());
     }
 }
