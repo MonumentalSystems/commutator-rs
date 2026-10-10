@@ -78,6 +78,25 @@ fibers. It is a portable numerical reference crate: neural-network frameworks,
 model configuration, serialization, accelerator kernels, and distributed
 execution remain outside its boundary.
 
+## Research simulation crates
+
+The research suite follows the same rule: each crate owns one scientific
+contract and leaves large solvers or deployment concerns outside.
+
+- `field-lyapunov` owns matrix-free tangent-flow and finite-time chaos
+  diagnostics.
+- `quantum-chaos` owns diagnostics over supplied spectra.
+- `quantum-magnetism` owns finite spin-1/2 reference Hamiltonians and
+  observables; `spin-lattice` owns classical magnetoelastic dynamics.
+- `superconductivity` owns checked BdG assembly and observables;
+  `majorana-fermions` owns sparse Majorana operator algebra.
+- `cluster-green` owns cluster Green-function validation and embedding;
+  `quantum-transport` consumes its matrix convention for coherent NEGF.
+- `quantum-light` owns bounded photonic Fock states and counting observables;
+  `quantum-shadows` owns local-Pauli measurement reduction.
+
+See [`research-suite.md`](research-suite.md) for workflows and non-goals.
+
 ## Host adapters
 
 A host may connect those layers to SIMD, Metal, CUDA, Accelerate, WebGPU,

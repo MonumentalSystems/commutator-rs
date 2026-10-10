@@ -21,6 +21,16 @@ or volunteer-computing backends.
 | [`experiment-core`](experiment-core) | Transport-neutral work, result, topology, verification, checkpoint-reference, and reproducibility contracts | Serde |
 | [`experiment-merkle`](experiment-merkle) | Context-bound SHA-256 commitments, inclusion proofs, and deterministic post-commitment spot checks | `experiment-core`, Serde, SHA-2 |
 | [`harmonic-dynamics`](harmonic-dynamics) | Safe `S¹`/Kuramoto, quaternion and sphere geometry, Lohe synchronization, gated scans, and Helmholtz sequence fibers | none |
+| [`field-lyapunov`](field-lyapunov) | Matrix-free top-k Lyapunov spectra, finite-time estimates, RK4 tangent flow, and chaos diagnostics | none |
+| [`quantum-chaos`](quantum-chaos) | Level-spacing ratios, spectral form factors, number variance, and explicit unfolding policies | `num-complex` |
+| [`quantum-magnetism`](quantum-magnetism) | Matrix-free finite spin-1/2 models, frustrated exchange, observables, and reference Lanczos | `num-complex` |
+| [`spin-lattice`](spin-lattice) | Coupled harmonic lattice and distance-dependent Heisenberg dynamics from one checked Hamiltonian | none |
+| [`superconductivity`](superconductivity) | Spinful onsite s-wave BdG assembly, symmetry checks, LDOS, and pairing observables | `num-complex` |
+| [`majorana-fermions`](majorana-fermions) | Sparse Majorana/fermion operator algebra and quadratic Kitaev-chain Hamiltonians | `num-complex` |
+| [`cluster-green`](cluster-green) | Checked cluster Green functions, causality, CPT/Dyson embedding, and periodization | `num-complex` |
+| [`quantum-transport`](quantum-transport) | Coherent NEGF device Green functions, broadenings, Caroli transmission, and Landauer current | `cluster-green` |
+| [`quantum-light`](quantum-light) | Finite Fock states, passive optics, photon statistics, and reduced density matrices | `num-complex` |
+| [`quantum-shadows`](quantum-shadows) | Local-Pauli classical-shadow estimators and robust uncertainty reductions | none |
 
 The foundational crates deliberately do not contain HTTP, databases, identity,
 scheduling, or a particular scientific model. Those capabilities belong in
@@ -82,10 +92,22 @@ experiment-core                 harmonic-dynamics
                  +-------------+-------------+
                                |
         host runtimes, optimized backends, and distributed schedulers
+
+field-lyapunov          quantum-chaos
+      |                       |
+      +------ dynamics -------+
+
+quantum-magnetism       spin-lattice       superconductivity
+                              |                    |
+majorana-fermions       cluster-green ---- quantum-transport
+
+quantum-light           quantum-shadows
 ```
 
 See [Architecture](docs/architecture.md) for the crate boundaries and
 [Distributed science](docs/distributed-science.md) for the adapter model.
+See [Research suite](docs/research-suite.md) for scientific workflows,
+interoperability boundaries, and deliberate non-goals.
 The algebra conventions and golden vectors are versioned in
 [`clifford-core/CONVENTIONS.md`](clifford-core/CONVENTIONS.md).
 

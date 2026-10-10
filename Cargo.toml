@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "cluster-green",
     "clifford-core",
     "clifford-field",
     "clifford-geometry",
@@ -8,9 +9,19 @@ members = [
     "clifford-mesh",
     "experiment-core",
     "experiment-merkle",
+    "field-lyapunov",
     "harmonic-dynamics",
+    "majorana-fermions",
+    "quantum-chaos",
+    "quantum-light",
+    "quantum-magnetism",
+    "quantum-shadows",
+    "quantum-transport",
+    "spin-lattice",
+    "superconductivity",
 ]
 default-members = [
+    "cluster-green",
     "clifford-core",
     "clifford-field",
     "clifford-geometry",
@@ -19,7 +30,16 @@ default-members = [
     "clifford-mesh",
     "experiment-core",
     "experiment-merkle",
+    "field-lyapunov",
     "harmonic-dynamics",
+    "majorana-fermions",
+    "quantum-chaos",
+    "quantum-light",
+    "quantum-magnetism",
+    "quantum-shadows",
+    "quantum-transport",
+    "spin-lattice",
+    "superconductivity",
 ]
 resolver = "2"
 
