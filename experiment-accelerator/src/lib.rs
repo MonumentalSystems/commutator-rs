@@ -44,6 +44,8 @@ pub enum AdapterError {
     EmptyWorkerIdentity,
     /// Generated execution provenance would overwrite an existing attribute.
     ProvenanceConflict(String),
+    /// A backend changed its descriptor or execution fingerprint during qualification.
+    UnstableExecutionFingerprint,
 }
 
 impl fmt::Display for AdapterError {
@@ -75,6 +77,12 @@ impl fmt::Display for AdapterError {
                 write!(
                     formatter,
                     "execution provenance attribute {name} already exists"
+                )
+            }
+            Self::UnstableExecutionFingerprint => {
+                write!(
+                    formatter,
+                    "backend execution identity changed during qualification"
                 )
             }
         }
@@ -333,6 +341,18 @@ pub trait ComputeBackend<W, R> {
 
     /// Returns stable backend metadata.
     fn descriptor(&self) -> &BackendDescriptor;
+    /// Returns a checked digest of the concrete executable implementation.
+    ///
+    /// The compatibility default binds the complete descriptor. Backends whose
+    /// descriptor does not fully identify kernels, child composition, runtime,
+    /// or device equivalence class must override this method. The value must
+    /// remain stable before and after one execution.
+    fn execution_fingerprint(&self) -> Result<[u8; 32], AdapterError> {
+        canonical_digest(
+            b"commutator.execution-fingerprint.descriptor-default.v1",
+            self.descriptor(),
+        )
+    }
     /// Executes one payload with the work unit's deterministic seed.
     fn execute(&mut self, payload: &W, seed: u64) -> Result<BackendOutput<R>, Self::Error>;
 }
@@ -437,7 +457,9 @@ where
     let authorized = match authorization {
         ExecutionAuthorization::Reference(reference) => reference.authorizes(backend.descriptor()),
         ExecutionAuthorization::Differential { report, policy } => {
-            report.qualifies(backend.descriptor(), worker, work, policy)
+            backend.execution_fingerprint().is_ok_and(|fingerprint| {
+                report.qualifies(backend.descriptor(), &fingerprint, worker, work, policy)
+            })
         }
     };
     if !authorized {
@@ -482,6 +504,14 @@ where
     let output = backend
         .execute(&work.payload, work.run.seed)
         .map_err(ExecutionError::Backend)?;
+    if let ExecutionAuthorization::Differential { report, policy } = authorization {
+        let still_authorized = backend.execution_fingerprint().is_ok_and(|fingerprint| {
+            report.qualifies(backend.descriptor(), &fingerprint, worker, work, policy)
+        });
+        if !still_authorized {
+            return Err(ExecutionError::UnqualifiedBackend);
+        }
+    }
     let (payload, metrics) = output.into_parts();
     if let Some((name, _)) = metrics
         .iter()
@@ -683,7 +713,7 @@ pub trait ResultComparator<R> {
 ///
 /// Reports intentionally implement neither serialization nor deserialization:
 /// safe code can obtain an admission capability only from [`differential_check`].
-/// Use [`Self::audit_snapshot`] for serialize-only provenance evidence.
+/// Use [`Self::audit_snapshot`] for a serialize-only commitment summary.
 ///
 /// ```compile_fail
 /// use experiment_accelerator::DifferentialReport;
@@ -704,12 +734,16 @@ pub struct DifferentialReport {
     reference_version: String,
     /// Canonical digest of the complete reference descriptor.
     reference_descriptor_sha256: [u8; 32],
+    /// Digest of the concrete reference execution implementation.
+    reference_execution_fingerprint_sha256: [u8; 32],
     /// Candidate backend identifier.
     candidate_backend: String,
     /// Candidate implementation version.
     candidate_version: String,
     /// Canonical digest of the complete candidate descriptor.
     candidate_descriptor_sha256: [u8; 32],
+    /// Digest of the concrete candidate execution implementation.
+    candidate_execution_fingerprint_sha256: [u8; 32],
     /// Worker identity used for qualification.
     worker_id: String,
     /// Canonical digest of the complete worker context.
@@ -755,18 +789,24 @@ impl DifferentialReport {
         self.seed
     }
 
-    /// Returns a serializable evidence snapshot that carries no admission
+    /// Returns a serializable commitment summary that carries no admission
     /// authority and cannot be converted back into this report.
     #[must_use]
     pub fn audit_snapshot(&self) -> QualificationAudit {
         QualificationAudit {
-            schema: "commutator.accelerator-qualification.v1",
+            schema: "commutator.accelerator-qualification.v2",
             reference_backend: self.reference_backend.clone(),
             reference_version: self.reference_version.clone(),
             reference_descriptor_sha256: digest_hex(&self.reference_descriptor_sha256),
+            reference_execution_fingerprint_sha256: digest_hex(
+                &self.reference_execution_fingerprint_sha256,
+            ),
             candidate_backend: self.candidate_backend.clone(),
             candidate_version: self.candidate_version.clone(),
             candidate_descriptor_sha256: digest_hex(&self.candidate_descriptor_sha256),
+            candidate_execution_fingerprint_sha256: digest_hex(
+                &self.candidate_execution_fingerprint_sha256,
+            ),
             worker_id: self.worker_id.clone(),
             worker_sha256: digest_hex(&self.worker_sha256),
             experiment_id: self.experiment_id.clone(),
@@ -785,6 +825,7 @@ impl DifferentialReport {
     fn qualifies<W: Serialize>(
         &self,
         descriptor: &BackendDescriptor,
+        execution_fingerprint: &[u8; 32],
         worker: &WorkerContext,
         work: &WorkUnit<W>,
         policy: &QualificationPolicy,
@@ -797,6 +838,7 @@ impl DifferentialReport {
             && self.candidate_version == descriptor.implementation_version
             && canonical_digest(b"commutator.candidate-descriptor.v1", descriptor)
                 .is_ok_and(|digest| digest == self.candidate_descriptor_sha256)
+            && *execution_fingerprint == self.candidate_execution_fingerprint_sha256
             && self.worker_id == worker.worker_id
             && canonical_digest(b"commutator.worker-context.v1", worker)
                 .is_ok_and(|digest| digest == self.worker_sha256)
@@ -811,7 +853,7 @@ impl DifferentialReport {
     }
 }
 
-/// Serializable, non-authoritative evidence from a differential check.
+/// Serializable, non-authoritative commitment summary from a differential check.
 ///
 /// This snapshot deliberately implements `Serialize` but not `Deserialize`.
 /// Even a snapshot obtained from a trusted log cannot be used with
@@ -836,9 +878,11 @@ pub struct QualificationAudit {
     reference_backend: String,
     reference_version: String,
     reference_descriptor_sha256: String,
+    reference_execution_fingerprint_sha256: String,
     candidate_backend: String,
     candidate_version: String,
     candidate_descriptor_sha256: String,
+    candidate_execution_fingerprint_sha256: String,
     worker_id: String,
     worker_sha256: String,
     experiment_id: String,
@@ -884,6 +928,18 @@ impl QualificationAudit {
         &self.candidate_descriptor_sha256
     }
 
+    /// Returns the concrete reference execution fingerprint.
+    #[must_use]
+    pub fn reference_execution_fingerprint_sha256(&self) -> &str {
+        &self.reference_execution_fingerprint_sha256
+    }
+
+    /// Returns the concrete candidate execution fingerprint.
+    #[must_use]
+    pub fn candidate_execution_fingerprint_sha256(&self) -> &str {
+        &self.candidate_execution_fingerprint_sha256
+    }
+
     /// Returns the canonical digest of the complete worker context.
     #[must_use]
     pub fn worker_sha256(&self) -> &str {
@@ -919,12 +975,13 @@ pub enum DifferentialError<ReferenceError, CandidateError> {
 /// Runs portable and optimized backends on the same typed work unit.
 ///
 /// The returned report is bound to the work serialization, worker identity,
-/// complete backend descriptors, and the checked qualification policy. Its
-/// final acceptance bit enforces both policy tolerances in addition to the
-/// comparator's scientific-invariant decision. An accepted report and the
-/// identical current policy are required by [`execute_work_unit`] for an
-/// optimized backend. The reference backend must carry a capability minted by
-/// a host-owned allowlist.
+/// complete backend descriptors, concrete execution fingerprints, and the
+/// checked qualification policy. Fingerprints are sampled before and after the
+/// check and must remain stable. Its final acceptance bit enforces both policy
+/// tolerances in addition to the comparator's scientific-invariant decision.
+/// An accepted report and the identical current policy are required by
+/// [`execute_work_unit`] for an optimized backend. The reference backend must
+/// carry a capability minted by a host-owned allowlist.
 pub fn differential_check<W, R, Reference, Candidate, Comparator>(
     reference: &mut Reference,
     reference_authorization: &ReferenceAuthorization,
@@ -962,16 +1019,6 @@ where
             AdapterError::InvalidCapability,
         ));
     }
-    let reference_output = reference
-        .execute(&work.payload, work.run.seed)
-        .map_err(DifferentialError::Reference)?;
-    let candidate_output = candidate
-        .execute(&work.payload, work.run.seed)
-        .map_err(DifferentialError::Candidate)?;
-    let mut comparison = comparator
-        .compare(reference_output.payload(), candidate_output.payload())
-        .map_err(DifferentialError::Comparison)?;
-    comparison.accepted = policy.accepts(&comparison);
     let reference_descriptor_sha256 = canonical_digest(
         b"commutator.reference-descriptor.v1",
         reference.descriptor(),
@@ -982,6 +1029,52 @@ where
         candidate.descriptor(),
     )
     .map_err(DifferentialError::InvalidBoundary)?;
+    let reference_execution_fingerprint_sha256 = reference
+        .execution_fingerprint()
+        .map_err(DifferentialError::InvalidBoundary)?;
+    let candidate_execution_fingerprint_sha256 = candidate
+        .execution_fingerprint()
+        .map_err(DifferentialError::InvalidBoundary)?;
+    let reference_output = reference
+        .execute(&work.payload, work.run.seed)
+        .map_err(DifferentialError::Reference)?;
+    let candidate_output = candidate
+        .execute(&work.payload, work.run.seed)
+        .map_err(DifferentialError::Candidate)?;
+    if reference
+        .execution_fingerprint()
+        .map_err(DifferentialError::InvalidBoundary)?
+        != reference_execution_fingerprint_sha256
+        || candidate
+            .execution_fingerprint()
+            .map_err(DifferentialError::InvalidBoundary)?
+            != candidate_execution_fingerprint_sha256
+    {
+        return Err(DifferentialError::InvalidBoundary(
+            AdapterError::UnstableExecutionFingerprint,
+        ));
+    }
+    if canonical_digest(
+        b"commutator.reference-descriptor.v1",
+        reference.descriptor(),
+    )
+    .map_err(DifferentialError::InvalidBoundary)?
+        != reference_descriptor_sha256
+        || canonical_digest(
+            b"commutator.candidate-descriptor.v1",
+            candidate.descriptor(),
+        )
+        .map_err(DifferentialError::InvalidBoundary)?
+            != candidate_descriptor_sha256
+    {
+        return Err(DifferentialError::InvalidBoundary(
+            AdapterError::UnstableExecutionFingerprint,
+        ));
+    }
+    let mut comparison = comparator
+        .compare(reference_output.payload(), candidate_output.payload())
+        .map_err(DifferentialError::Comparison)?;
+    comparison.accepted = policy.accepts(&comparison);
     let worker_sha256 = canonical_digest(b"commutator.worker-context.v1", worker)
         .map_err(DifferentialError::InvalidBoundary)?;
     let work_sha256 = canonical_digest(b"commutator.work-unit.v1", work)
@@ -992,9 +1085,11 @@ where
         reference_backend: reference.descriptor().id.clone(),
         reference_version: reference.descriptor().implementation_version.clone(),
         reference_descriptor_sha256,
+        reference_execution_fingerprint_sha256,
         candidate_backend: candidate.descriptor().id.clone(),
         candidate_version: candidate.descriptor().implementation_version.clone(),
         candidate_descriptor_sha256,
+        candidate_execution_fingerprint_sha256,
         worker_id: worker.worker_id.clone(),
         worker_sha256,
         experiment_id: work.experiment_id.clone(),
@@ -1020,7 +1115,7 @@ fn digest_hex(digest: &[u8; 32]) -> String {
     encoded
 }
 
-fn canonical_digest<T: Serialize + ?Sized>(
+pub(crate) fn canonical_digest<T: Serialize + ?Sized>(
     domain: &[u8],
     value: &T,
 ) -> Result<[u8; 32], AdapterError> {
@@ -1195,6 +1290,35 @@ mod tests {
                 BTreeMap::new(),
             )
             .unwrap())
+        }
+    }
+
+    struct MutatingFingerprintBackend {
+        descriptor: BackendDescriptor,
+        fingerprint_tag: u8,
+        mutate_on_execute: bool,
+    }
+
+    impl ComputeBackend<Vec<f64>, Vec<f64>> for MutatingFingerprintBackend {
+        type Error = ();
+
+        fn descriptor(&self) -> &BackendDescriptor {
+            &self.descriptor
+        }
+
+        fn execution_fingerprint(&self) -> Result<[u8; 32], AdapterError> {
+            Ok([self.fingerprint_tag; 32])
+        }
+
+        fn execute(
+            &mut self,
+            payload: &Vec<f64>,
+            _seed: u64,
+        ) -> Result<BackendOutput<Vec<f64>>, Self::Error> {
+            if self.mutate_on_execute {
+                self.fingerprint_tag = self.fingerprint_tag.wrapping_add(1);
+            }
+            Ok(BackendOutput::try_new(payload.clone(), BTreeMap::new()).unwrap())
         }
     }
 
@@ -1526,7 +1650,7 @@ mod tests {
     }
 
     #[test]
-    fn audit_snapshot_serializes_complete_evidence_without_admission_authority() {
+    fn audit_snapshot_serializes_commitments_without_admission_authority() {
         let mut reference = ScaleBackend {
             descriptor: descriptor("reference", BackendKind::CpuReference),
             scale: 1.0,
@@ -1561,7 +1685,7 @@ mod tests {
 
         let audit = report.audit_snapshot();
         let value = serde_json::to_value(&audit).unwrap();
-        assert_eq!(value["schema"], "commutator.accelerator-qualification.v1");
+        assert_eq!(value["schema"], "commutator.accelerator-qualification.v2");
         assert_eq!(value["reference_backend"], "reference");
         assert_eq!(value["candidate_backend"], "gpu");
         assert_eq!(value["worker_id"], "gpu-worker");
@@ -1572,7 +1696,9 @@ mod tests {
         assert_eq!(value["policy"]["id"], "vector-max-error");
         for field in [
             "reference_descriptor_sha256",
+            "reference_execution_fingerprint_sha256",
             "candidate_descriptor_sha256",
+            "candidate_execution_fingerprint_sha256",
             "worker_sha256",
             "work_sha256",
             "policy_sha256",
@@ -1582,6 +1708,57 @@ mod tests {
             assert!(digest.bytes().all(|byte| byte.is_ascii_hexdigit()));
         }
         assert!(audit.comparison().accepted());
+    }
+
+    #[test]
+    fn admitted_execution_rechecks_a_mutating_fingerprint() {
+        let mut reference = ScaleBackend {
+            descriptor: descriptor("reference", BackendKind::CpuReference),
+            scale: 1.0,
+        };
+        let mut candidate = MutatingFingerprintBackend {
+            descriptor: descriptor("gpu", BackendKind::Gpu),
+            fingerprint_tag: 7,
+            mutate_on_execute: false,
+        };
+        let mut worker = WorkerContext {
+            worker_id: "gpu-worker".into(),
+            ..WorkerContext::default()
+        };
+        worker
+            .capabilities
+            .insert(GPU_AVAILABLE_CAPABILITY.into(), 1.0);
+        worker.labels.insert(GPU_API_LABEL.into(), "test".into());
+        let work = independent_replica_work("diff", "run", 0, 1, 0, [(17, vec![2.0])])
+            .unwrap()
+            .remove(0);
+        let authorization = reference_authorization(&reference.descriptor);
+        let policy = policy(1e-12);
+        let report = differential_check(
+            &mut reference,
+            &authorization,
+            &mut candidate,
+            &worker,
+            &work,
+            &policy,
+            &VectorComparator { tolerance: 1e-12 },
+        )
+        .unwrap();
+
+        candidate.mutate_on_execute = true;
+        assert!(matches!(
+            execute_work_unit(
+                &mut candidate,
+                &worker,
+                &work,
+                1,
+                ExecutionAuthorization::Differential {
+                    report: &report,
+                    policy: &policy,
+                },
+            ),
+            Err(ExecutionError::UnqualifiedBackend)
+        ));
     }
 
     #[test]

@@ -55,6 +55,7 @@ fn real_cuda_affine_backend_is_differentially_qualified() {
     )
     .unwrap();
     let policy = QualificationPolicy::try_new("f64-affine", "v1", 1e-14, 1e-14).unwrap();
+    let fingerprint_before = cuda.execution_fingerprint().unwrap();
     let report = differential_check(
         &mut reference,
         &authorization,
@@ -66,5 +67,19 @@ fn real_cuda_affine_backend_is_differentially_qualified() {
     )
     .unwrap();
     assert!(report.comparison().accepted(), "{report:?}");
+    assert_eq!(
+        cuda.execution_fingerprint().unwrap(),
+        fingerprint_before,
+        "CUDA execution identity changed across a real launch"
+    );
+    assert_eq!(
+        report
+            .audit_snapshot()
+            .candidate_execution_fingerprint_sha256(),
+        fingerprint_before
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    );
     eprintln!("validated CUDA device: {}", cuda.device_name());
 }

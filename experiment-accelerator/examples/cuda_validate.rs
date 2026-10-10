@@ -8,6 +8,16 @@ use experiment_accelerator::{
 };
 use serde_json::json;
 
+fn digest_hex(digest: [u8; 32]) -> String {
+    use std::fmt::Write as _;
+
+    let mut encoded = String::with_capacity(64);
+    for byte in digest {
+        write!(&mut encoded, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    encoded
+}
+
 struct F64Comparator;
 
 impl ResultComparator<Vec<f64>> for F64Comparator {
@@ -60,18 +70,55 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .map_err(|error| format!("differential validation failed: {error:?}"))?;
     let audit = report.audit_snapshot();
-    let (compute_major, compute_minor) = cuda.compute_capability()?;
+    let reference_fingerprint = reference.execution_fingerprint()?;
+    let candidate_fingerprint = cuda.execution_fingerprint()?;
+    let reference_output = reference.execute(&work.payload, work.run.seed)?;
+    let candidate_output = cuda.execute(&work.payload, work.run.seed)?;
+    let (compute_major, compute_minor) = cuda.compute_capability();
+    let (nvrtc_major, nvrtc_minor) = cuda.nvrtc_version();
     let evidence = json!({
-        "schema": "commutator.cuda-validation.v1",
-        "cudarc_version": "0.13.9",
-        "cuda_api_bindings": "12.8",
-        "gpu_name": cuda.device_name(),
-        "gpu_ordinal": cuda.device_ordinal(),
-        "compute_capability": format!("{compute_major}.{compute_minor}"),
-        "nvidia_driver": std::env::var("NVIDIA_DRIVER_VERSION").unwrap_or_else(|_| "not-recorded".to_owned()),
-        "backend": cuda.descriptor(),
-        "policy": policy,
-        "qualification": audit,
+        "schema": "commutator.cuda-validation.v2",
+        "provenance": {
+            "authenticated": false,
+            "statement": "This hardware observation is unauthenticated until covered by signed release provenance. It is not an admission capability."
+        },
+        "software": {
+            "crate": "experiment-accelerator",
+            "crate_version": env!("CARGO_PKG_VERSION"),
+            "cudarc_version": "0.13.9",
+            "cuda_api_bindings": "12.8",
+            "nvrtc_version": format!("{nvrtc_major}.{nvrtc_minor}"),
+            "driver_api_version": cuda.driver_api_version(),
+            "nvidia_driver_package": std::env::var("NVIDIA_DRIVER_VERSION").unwrap_or_else(|_| "not-recorded".to_owned()),
+        },
+        "device": {
+            "name": cuda.device_name(),
+            "uuid": cuda.device_uuid(),
+            "ordinal": cuda.device_ordinal(),
+            "compute_capability": format!("{compute_major}.{compute_minor}"),
+        },
+        "kernel": {
+            "algorithm_version": "f64-affine-fma-v1",
+            "module": "experiment_accelerator_affine_f64",
+            "function": "affine_f64",
+            "source_sha256": digest_hex(cuda.kernel_source_sha256()),
+            "ptx_sha256": digest_hex(cuda.ptx_sha256()),
+        },
+        "raw_recomputation_inputs": {
+            "reference_descriptor": reference.descriptor(),
+            "candidate_descriptor": cuda.descriptor(),
+            "reference_algorithm_version": "f64-affine-mul-add-v1",
+            "reference_execution_fingerprint_sha256": digest_hex(reference_fingerprint),
+            "candidate_execution_fingerprint_sha256": digest_hex(candidate_fingerprint),
+            "worker_context": worker,
+            "work_unit": work,
+            "policy": policy,
+        },
+        "observed_outputs": {
+            "reference": reference_output.payload(),
+            "candidate": candidate_output.payload(),
+        },
+        "qualification_commitments": audit,
     });
     println!("{}", serde_json::to_string_pretty(&evidence)?);
     if !report.comparison().accepted() {

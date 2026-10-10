@@ -3,8 +3,17 @@ use std::collections::BTreeMap;
 use serde::Serialize;
 
 use crate::{
-    AdapterError, BackendDescriptor, BackendKind, BackendOutput, ComputeBackend, Precision,
+    canonical_digest, AdapterError, BackendDescriptor, BackendKind, BackendOutput, ComputeBackend,
+    Precision,
 };
+
+#[derive(Serialize)]
+struct AffineCpuExecutionIdentity<'a> {
+    schema: &'static str,
+    algorithm_version: &'static str,
+    crate_version: &'static str,
+    descriptor: &'a BackendDescriptor,
+}
 
 /// Checked f64 vector-affine input, `output[i] = scale * input[i] + bias`.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -120,6 +129,18 @@ impl ComputeBackend<AffineVectorWork, Vec<f64>> for AffineCpuBackend {
 
     fn descriptor(&self) -> &BackendDescriptor {
         &self.descriptor
+    }
+
+    fn execution_fingerprint(&self) -> Result<[u8; 32], AdapterError> {
+        canonical_digest(
+            b"commutator.affine-cpu-execution.v1",
+            &AffineCpuExecutionIdentity {
+                schema: "commutator.affine-cpu-execution.v1",
+                algorithm_version: "f64-affine-mul-add-v1",
+                crate_version: env!("CARGO_PKG_VERSION"),
+                descriptor: &self.descriptor,
+            },
+        )
     }
 
     fn execute(

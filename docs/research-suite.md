@@ -115,7 +115,9 @@ execution of a checked vector-affine kernel and is differentially qualified
 against its CPU reference. Hardware evidence belongs under the crate's
 `evidence/` directory and is not itself an admission capability. The committed
 GB10 record captures an accepted zero-error comparison on NVIDIA GB10 with
-driver 580.173.02 for that narrow affine contract; it is not a general hardware
+driver 580.173.02 for that narrow affine contract. It contains raw commitment
+preimages for independent inspection but remains unauthenticated until covered
+by signed release provenance; it is not a general hardware
 correctness or performance claim.
 
 ## Interoperability contracts

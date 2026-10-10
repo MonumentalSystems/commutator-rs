@@ -17,10 +17,12 @@ runtime, or a network transport. Hardware crates can implement `ComputeBackend`
 and use the same validation harness in their own CI or startup qualification.
 Accepted qualification reports are constructible only by the differential
 check API and are bound to the serialized work unit, worker identity, backend
-descriptors, and an explicit versioned policy with absolute and relative error
-limits. Reports remain opaque in-process admission capabilities. A separate
-serialize-only audit snapshot records the full evidence for logs but cannot be
-deserialized or used as an admission token.
+descriptors, concrete execution fingerprints, and an explicit versioned policy
+with absolute and relative error limits. Fingerprints are checked again after
+admitted execution to close mutation during a call. Reports remain opaque
+in-process admission capabilities. A separate serialize-only audit snapshot
+records a commitment summary for logs but does not contain its raw preimages
+and cannot be deserialized or used as an admission token.
 
 ```rust
 use experiment_accelerator::{partition_range, BackendDescriptor, BackendKind, Precision,
@@ -50,23 +52,29 @@ numeric limits and the comparator's scientific-invariant decision must pass.
 
 Qualification reports are opaque in-process capabilities, not portable trust
 certificates. They cannot be serialized or deserialized. `audit_snapshot()`
-produces the serialize-only evidence record; a distributed host should sign or
-authenticate those bytes when persisting or transmitting them and must recreate
-authorization from a trusted reference allowlist after restart. Audit evidence
-cannot recreate an admission capability.
+produces a serialize-only commitment summary; a distributed host should retain
+the raw descriptor, worker, work, and implementation inputs and sign or
+authenticate the resulting artifact when persisting or transmitting it. The
+host must recreate authorization from a trusted reference allowlist after
+restart. An audit summary cannot recreate an admission capability.
 Work binding uses domain-separated SHA-256 over recursively key-sorted canonical
 JSON; payload types therefore need stable Serde value semantics.
 
 ## Concrete adapters
 
-`ThreadedShardedBackend<B, W, R>` is a deterministically scheduled,
-transport-neutral distributed reference. It assigns at most one contiguous shard to each child backend,
+`ThreadedShardedBackend<B, W, R>` is a deterministically partitioned,
+transport-neutral distributed reference. It assigns at most one contiguous
+shard to each child backend,
 derives a stable per-shard seed, executes children on scoped threads, checks
 each result length, namespaces child metrics, and rejoins results in input order
 regardless of completion order. A child error or panic identifies its stable
 shard ordinal and rejects the whole result. Its descriptor derives determinism,
 precision, numeric requirements, and exact labels from the child descriptors;
 mixed precision is reported honestly and conflicting child labels are rejected.
+Its execution fingerprint recursively binds the ordered child descriptors and
+fingerprints, child count, partition algorithm, and seed-derivation version.
+Every scoped handle is joined; if multiple shards fail, the lowest shard
+ordinal determines the returned error.
 
 The optional `cuda` feature provides `CudaAffineBackend`, a real f64 CUDA
 backend for the checked `AffineVectorWork` contract. It uses cudarc/NVRTC to
@@ -82,10 +90,16 @@ NVIDIA_DRIVER_VERSION=580.173.02 \
 ```
 
 CUDA is optional and dynamically loaded; default builds remain portable. The
-embedded launch contains one narrowly documented unsafe boundary because CUDA
-kernel argument signatures cannot be checked by Rust. The checked buffer
-length, element type, context ownership, and kernel signature are kept together
-at that boundary.
+module has narrow documented unsafe boundaries for the kernel launch and raw
+driver/NVRTC version queries. The checked buffer length, element type, context
+ownership, and kernel signature are kept together at the launch boundary. Its
+execution fingerprint binds CUDA source and generated PTX digests, algorithm
+version, device UUID/name/ordinal/compute capability, and driver/NVRTC API
+versions.
 
-The committed GB10 validation record is
+The committed GB10 validation record contains the raw descriptors, worker,
+work unit and payload, policy, outputs, fingerprints, kernel digests, and
+device/software metadata needed to inspect or reproduce its commitments. It is
+an unauthenticated hardware observation until covered by signed release
+provenance and remains unusable for admission:
 [`evidence/cuda-gb10-driver-580.173.02.json`](evidence/cuda-gb10-driver-580.173.02.json).

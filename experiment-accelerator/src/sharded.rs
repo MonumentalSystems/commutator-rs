@@ -1,10 +1,31 @@
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
 
+use serde::Serialize;
+
 use crate::{
-    partition_range, AdapterError, BackendDescriptor, BackendKind, BackendOutput, ComputeBackend,
-    Precision,
+    canonical_digest, partition_range, AdapterError, BackendDescriptor, BackendKind, BackendOutput,
+    ComputeBackend, Precision,
 };
+
+const PARTITION_ALGORITHM: &str = "contiguous-ceiling-at-most-one-per-child-v1";
+const SEED_ALGORITHM: &str = "splitmix64-parent-seed-and-shard-ordinal-v1";
+
+#[derive(Serialize)]
+struct ShardedExecutionIdentity<'a> {
+    schema: &'static str,
+    partition_algorithm: &'static str,
+    seed_algorithm: &'static str,
+    child_count: usize,
+    children: Vec<ShardedChildIdentity<'a>>,
+}
+
+#[derive(Serialize)]
+struct ShardedChildIdentity<'a> {
+    ordinal: usize,
+    descriptor: &'a BackendDescriptor,
+    execution_fingerprint_sha256: [u8; 32],
+}
 
 /// Derives a deterministic, distinct child seed from a parent seed and shard ordinal.
 #[must_use]
@@ -165,6 +186,31 @@ where
         &self.descriptor
     }
 
+    fn execution_fingerprint(&self) -> Result<[u8; 32], AdapterError> {
+        let children = self
+            .children
+            .iter()
+            .enumerate()
+            .map(|(ordinal, child)| {
+                Ok(ShardedChildIdentity {
+                    ordinal,
+                    descriptor: child.descriptor(),
+                    execution_fingerprint_sha256: child.execution_fingerprint()?,
+                })
+            })
+            .collect::<Result<Vec<_>, AdapterError>>()?;
+        canonical_digest(
+            b"commutator.threaded-sharded-execution.v1",
+            &ShardedExecutionIdentity {
+                schema: "commutator.threaded-sharded-execution.v1",
+                partition_algorithm: PARTITION_ALGORITHM,
+                seed_algorithm: SEED_ALGORITHM,
+                child_count: children.len(),
+                children,
+            },
+        )
+    }
+
     fn execute(
         &mut self,
         payload: &Vec<W>,
@@ -197,16 +243,28 @@ where
                 ));
             }
 
-            handles
-                .into_iter()
-                .map(|(shard, chunk, handle)| {
-                    let output = handle
-                        .join()
-                        .map_err(|_| ShardedError::ChildPanicked { shard })?
-                        .map_err(|source| ShardedError::Child { shard, source })?;
-                    Ok((shard, chunk, output))
-                })
-                .collect::<Result<Vec<_>, ShardedError<B::Error>>>()
+            let mut outcomes = Vec::with_capacity(handles.len());
+            let mut first_error = None;
+            for (shard, chunk, handle) in handles {
+                let outcome = match handle.join() {
+                    Ok(Ok(output)) if output.payload().len() == chunk.len() => {
+                        Ok((shard, chunk, output))
+                    }
+                    Ok(Ok(output)) => Err(ShardedError::ResultLength {
+                        shard,
+                        expected: chunk.len(),
+                        actual: output.payload().len(),
+                    }),
+                    Ok(Err(source)) => Err(ShardedError::Child { shard, source }),
+                    Err(_) => Err(ShardedError::ChildPanicked { shard }),
+                };
+                match outcome {
+                    Ok(output) => outcomes.push(output),
+                    Err(error) if first_error.is_none() => first_error = Some(error),
+                    Err(_) => {}
+                }
+            }
+            first_error.map_or(Ok(outcomes), Err)
         })?;
 
         let mut ordered = Vec::new();
@@ -218,13 +276,7 @@ where
         metrics.insert("item.count".to_owned(), payload.len() as f64);
         for (shard, chunk, output) in outcomes {
             let (values, child_metrics) = output.into_parts();
-            if values.len() != chunk.len() {
-                return Err(ShardedError::ResultLength {
-                    shard,
-                    expected: chunk.len(),
-                    actual: values.len(),
-                });
-            }
+            debug_assert_eq!(values.len(), chunk.len());
             ordered.extend(values);
             metrics.extend(
                 child_metrics

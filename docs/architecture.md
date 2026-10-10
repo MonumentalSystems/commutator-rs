@@ -67,9 +67,11 @@ qualification reports that compare an optimized implementation with a
 portable reference. Reports bind work content, worker identity, backend IDs,
 implementation versions, precision, and a versioned policy with explicit
 absolute and relative tolerances. Opaque reports authorize only the exact work,
-worker, backend descriptor, and current policy checked in-process. Separate
-serialize-only audit snapshots expose full descriptor, worker, work, policy,
-and comparison evidence without providing a path back to admission authority.
+worker, backend descriptor, concrete execution fingerprint, and current policy
+checked in-process before and after execution. Separate serialize-only audit
+snapshots expose digests and the policy/comparison as a commitment summary, not
+the raw descriptor, worker, or work preimages, and provide no path back to
+admission authority.
 The default feature set contains no hardware API, and the crate contains no
 network transport. Neither configuration turns untrusted serialized evidence
 into an admission token.
@@ -79,7 +81,9 @@ one concrete hardware boundary: a checked f64 vector-affine backend performs
 real NVRTC compilation, device transfers, and kernel execution through cudarc,
 then uses the same differential qualification path as external accelerators.
 The committed NVIDIA GB10 record demonstrates that narrow affine contract for
-one documented driver and policy; it is not evidence for unrelated kernels.
+one documented driver and policy; it includes raw recomputation inputs but is
+unauthenticated until covered by signed release provenance and is not evidence
+for unrelated kernels.
 `ThreadedShardedBackend` is the concrete transport-neutral distributed
 reference: contiguous work is assigned to in-process child workers, child
 seeds are derived deterministically, failures retain shard ordinals, and output

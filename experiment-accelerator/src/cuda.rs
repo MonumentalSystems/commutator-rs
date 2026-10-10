@@ -5,14 +5,19 @@ use std::sync::Arc;
 
 use cudarc::driver::{CudaDevice, LaunchAsync, LaunchConfig};
 use cudarc::nvrtc::compile_ptx;
+use serde::Serialize;
+use sha2::{Digest, Sha256};
 
 use crate::{
-    AdapterError, AffineVectorWork, BackendDescriptor, BackendKind, BackendOutput, ComputeBackend,
-    Precision, GPU_API_LABEL, GPU_AVAILABLE_CAPABILITY,
+    canonical_digest, AdapterError, AffineVectorWork, BackendDescriptor, BackendKind,
+    BackendOutput, ComputeBackend, Precision, GPU_API_LABEL, GPU_AVAILABLE_CAPABILITY,
 };
 
 const MODULE_NAME: &str = "experiment_accelerator_affine_f64";
 const FUNCTION_NAME: &str = "affine_f64";
+const ALGORITHM_VERSION: &str = "f64-affine-fma-v1";
+const CUDARC_VERSION: &str = "0.13.9";
+const CUDA_API_BINDINGS: &str = "12.8";
 const CUDA_SOURCE: &str = r#"
 extern "C" __global__ void affine_f64(
     const double* input,
@@ -28,6 +33,25 @@ extern "C" __global__ void affine_f64(
     }
 }
 "#;
+
+#[derive(Serialize)]
+struct CudaExecutionIdentity<'a> {
+    schema: &'static str,
+    algorithm_version: &'static str,
+    descriptor: &'a BackendDescriptor,
+    module_name: &'static str,
+    function_name: &'static str,
+    kernel_source_sha256: [u8; 32],
+    ptx_sha256: [u8; 32],
+    cudarc_version: &'static str,
+    cuda_api_bindings: &'static str,
+    nvrtc_version: (i32, i32),
+    driver_api_version: i32,
+    device_ordinal: usize,
+    device_name: &'a str,
+    device_uuid: &'a str,
+    compute_capability: (i32, i32),
+}
 
 /// CUDA initialization, launch, transfer, or output validation failure.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -90,6 +114,12 @@ pub struct CudaAffineBackend {
     descriptor: BackendDescriptor,
     device: Arc<CudaDevice>,
     device_name: String,
+    device_uuid: String,
+    compute_capability: (i32, i32),
+    driver_api_version: i32,
+    nvrtc_version: (i32, i32),
+    kernel_source_sha256: [u8; 32],
+    ptx_sha256: [u8; 32],
 }
 
 impl std::fmt::Debug for CudaAffineBackend {
@@ -99,6 +129,10 @@ impl std::fmt::Debug for CudaAffineBackend {
             .field("descriptor", &self.descriptor)
             .field("device_ordinal", &self.device.ordinal())
             .field("device_name", &self.device_name)
+            .field("device_uuid", &self.device_uuid)
+            .field("compute_capability", &self.compute_capability)
+            .field("driver_api_version", &self.driver_api_version)
+            .field("nvrtc_version", &self.nvrtc_version)
             .finish_non_exhaustive()
     }
 }
@@ -115,8 +149,22 @@ impl CudaAffineBackend {
         let device_name = device
             .name()
             .map_err(|error| CudaAffineError::Driver(error.to_string()))?;
+        let device_uuid = device
+            .uuid()
+            .map(|uuid| {
+                uuid.bytes
+                    .iter()
+                    .map(|byte| format!("{:02x}", byte.to_ne_bytes()[0]))
+                    .collect::<String>()
+            })
+            .map_err(|error| CudaAffineError::Driver(error.to_string()))?;
+        let compute_capability = compute_capability(&device)?;
+        let driver_api_version = driver_api_version()?;
+        let nvrtc_version = nvrtc_version()?;
+        let kernel_source_sha256 = Sha256::digest(CUDA_SOURCE.as_bytes()).into();
         let ptx = compile_ptx(CUDA_SOURCE)
             .map_err(|error| CudaAffineError::Compilation(error.to_string()))?;
+        let ptx_sha256 = Sha256::digest(ptx.to_src().as_bytes()).into();
         device
             .load_ptx(ptx, MODULE_NAME, &[FUNCTION_NAME])
             .map_err(|error| CudaAffineError::Driver(error.to_string()))?;
@@ -137,6 +185,12 @@ impl CudaAffineBackend {
             descriptor,
             device,
             device_name,
+            device_uuid,
+            compute_capability,
+            driver_api_version,
+            nvrtc_version,
+            kernel_source_sha256,
+            ptx_sha256,
         })
     }
 
@@ -152,22 +206,40 @@ impl CudaAffineBackend {
         &self.device_name
     }
 
-    /// Returns the CUDA compute capability `(major, minor)`.
-    pub fn compute_capability(&self) -> Result<(i32, i32), CudaAffineError> {
-        use cudarc::driver::sys::CUdevice_attribute_enum::{
-            CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
-            CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
-        };
+    /// Returns the CUDA driver-reported device UUID as lowercase hexadecimal.
+    #[must_use]
+    pub fn device_uuid(&self) -> &str {
+        &self.device_uuid
+    }
 
-        let major = self
-            .device
-            .attribute(CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR)
-            .map_err(|error| CudaAffineError::Driver(error.to_string()))?;
-        let minor = self
-            .device
-            .attribute(CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR)
-            .map_err(|error| CudaAffineError::Driver(error.to_string()))?;
-        Ok((major, minor))
+    /// Returns the CUDA compute capability `(major, minor)`.
+    #[must_use]
+    pub const fn compute_capability(&self) -> (i32, i32) {
+        self.compute_capability
+    }
+
+    /// Returns the CUDA driver API version encoded as `1000 * major + 10 * minor`.
+    #[must_use]
+    pub const fn driver_api_version(&self) -> i32 {
+        self.driver_api_version
+    }
+
+    /// Returns the runtime NVRTC `(major, minor)` version.
+    #[must_use]
+    pub const fn nvrtc_version(&self) -> (i32, i32) {
+        self.nvrtc_version
+    }
+
+    /// Returns the SHA-256 digest of the embedded CUDA source bytes.
+    #[must_use]
+    pub const fn kernel_source_sha256(&self) -> [u8; 32] {
+        self.kernel_source_sha256
+    }
+
+    /// Returns the SHA-256 digest of the NVRTC-generated PTX loaded by this backend.
+    #[must_use]
+    pub const fn ptx_sha256(&self) -> [u8; 32] {
+        self.ptx_sha256
     }
 }
 
@@ -176,6 +248,29 @@ impl ComputeBackend<AffineVectorWork, Vec<f64>> for CudaAffineBackend {
 
     fn descriptor(&self) -> &BackendDescriptor {
         &self.descriptor
+    }
+
+    fn execution_fingerprint(&self) -> Result<[u8; 32], AdapterError> {
+        canonical_digest(
+            b"commutator.cuda-affine-execution.v1",
+            &CudaExecutionIdentity {
+                schema: "commutator.cuda-affine-execution.v1",
+                algorithm_version: ALGORITHM_VERSION,
+                descriptor: &self.descriptor,
+                module_name: MODULE_NAME,
+                function_name: FUNCTION_NAME,
+                kernel_source_sha256: self.kernel_source_sha256,
+                ptx_sha256: self.ptx_sha256,
+                cudarc_version: CUDARC_VERSION,
+                cuda_api_bindings: CUDA_API_BINDINGS,
+                nvrtc_version: self.nvrtc_version,
+                driver_api_version: self.driver_api_version,
+                device_ordinal: self.device.ordinal(),
+                device_name: &self.device_name,
+                device_uuid: &self.device_uuid,
+                compute_capability: self.compute_capability,
+            },
+        )
     }
 
     fn execute(
@@ -230,5 +325,48 @@ impl ComputeBackend<AffineVectorWork, Vec<f64>> for CudaAffineBackend {
             ]),
         )
         .map_err(CudaAffineError::InvalidMetrics)
+    }
+}
+
+fn compute_capability(device: &CudaDevice) -> Result<(i32, i32), CudaAffineError> {
+    use cudarc::driver::sys::CUdevice_attribute_enum::{
+        CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
+    };
+
+    let major = device
+        .attribute(CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR)
+        .map_err(|error| CudaAffineError::Driver(error.to_string()))?;
+    let minor = device
+        .attribute(CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR)
+        .map_err(|error| CudaAffineError::Driver(error.to_string()))?;
+    Ok((major, minor))
+}
+
+fn driver_api_version() -> Result<i32, CudaAffineError> {
+    let mut version = 0;
+    // SAFETY: CUDA was initialized by `CudaDevice::new`; `version` is a valid,
+    // writable `c_int` for the duration of this synchronous driver query.
+    let status = unsafe { cudarc::driver::sys::lib().cuDriverGetVersion(&mut version) };
+    if status == cudarc::driver::sys::CUresult::CUDA_SUCCESS {
+        Ok(version)
+    } else {
+        Err(CudaAffineError::Driver(format!(
+            "cuDriverGetVersion failed with {status:?}"
+        )))
+    }
+}
+
+fn nvrtc_version() -> Result<(i32, i32), CudaAffineError> {
+    let mut major = 0;
+    let mut minor = 0;
+    // SAFETY: `major` and `minor` are valid writable `c_int` pointers for this
+    // synchronous NVRTC query; loading NVRTC precedes kernel compilation.
+    let status = unsafe { cudarc::nvrtc::sys::lib().nvrtcVersion(&mut major, &mut minor) };
+    if status == cudarc::nvrtc::sys::nvrtcResult::NVRTC_SUCCESS {
+        Ok((major, minor))
+    } else {
+        Err(CudaAffineError::Compilation(format!(
+            "nvrtcVersion failed with {status:?}"
+        )))
     }
 }
