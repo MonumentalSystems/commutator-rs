@@ -1,0 +1,18 @@
+[package]
+name = "physics-conformance"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+license.workspace = true
+description = "Cross-crate convention and interoperability tests"
+
+[dependencies]
+cluster-embedding = { path = "../cluster-embedding" }
+keldysh-green = { path = "../keldysh-green" }
+open-quantum-systems = { path = "../open-quantum-systems" }
+quantum-shadows = { path = "../quantum-shadows" }
+quantum-tomography = { path = "../quantum-tomography" }
+quantum-transport = { path = "../quantum-transport" }
+superconducting-dynamics = { path = "../superconducting-dynamics" }
+superconductivity = { path = "../superconductivity" }
