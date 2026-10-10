@@ -22,8 +22,9 @@ Strang steppers, and array-based analysis. It depends inward on
 and Cl(6,0) types together with rotors, motors, meet/join operations, frames,
 interpolation, and kinematic chains. It preserves Versor's sparse typed
 geometry model while using `clifford-core` as the canonical convention and
-conformance boundary. Rendering, field simulation, and hardware backends are
-outside this crate.
+conformance boundary. Checked point and real dual-sphere decomposition provides
+the semantic boundary for consumers without exposing sparse blade positions.
+Rendering, field simulation, and hardware backends are outside this crate.
 
 ## Layer library
 
