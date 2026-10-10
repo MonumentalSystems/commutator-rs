@@ -9,6 +9,10 @@
 
 use core::fmt;
 
+/// Largest Pauli weight whose inverse-channel factor `3^weight` is finite in
+/// `f64`.
+pub const MAX_FINITE_PAULI_WEIGHT: usize = 646;
+
 /// A Pauli factor in a tensor-product observable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Pauli {
@@ -76,6 +80,18 @@ pub enum ShadowError {
     NonFiniteCoefficient,
     /// At least one observable term is required.
     EmptyObservable,
+    /// A Pauli string's inverse-channel factor would overflow `f64`.
+    PauliWeightOverflow {
+        /// Requested non-identity Pauli weight.
+        weight: usize,
+        /// Largest weight with a finite `3^weight` factor.
+        maximum: usize,
+    },
+    /// A finite-input statistical reduction overflowed or became non-finite.
+    NumericalOverflow {
+        /// Operation in which the non-finite value arose.
+        context: &'static str,
+    },
 }
 
 impl fmt::Display for ShadowError {
@@ -103,6 +119,12 @@ impl PauliString {
             return Err(ShadowError::ZeroQubits);
         }
         let weight = factors.iter().filter(|&&factor| factor != Pauli::I).count();
+        if weight > MAX_FINITE_PAULI_WEIGHT {
+            return Err(ShadowError::PauliWeightOverflow {
+                weight,
+                maximum: MAX_FINITE_PAULI_WEIGHT,
+            });
+        }
         Ok(Self { factors, weight })
     }
 
@@ -118,8 +140,11 @@ impl PauliString {
         self.weight
     }
 
-    fn bound(&self) -> f64 {
-        3.0_f64.powi(self.weight as i32)
+    fn bound(&self) -> Result<f64> {
+        checked_finite(
+            3.0_f64.powi(self.weight as i32),
+            "Pauli inverse-channel bound",
+        )
     }
 }
 
@@ -198,11 +223,17 @@ impl PauliObservable {
         &self.terms
     }
 
-    fn bound(&self) -> f64 {
-        self.terms
-            .iter()
-            .map(|(coefficient, string)| coefficient.abs() * string.bound())
-            .sum()
+    fn bound(&self) -> Result<f64> {
+        let mut bound = 0.0;
+        for (coefficient, string) in &self.terms {
+            let term = checked_mul(
+                coefficient.abs(),
+                string.bound()?,
+                "linear-observable Hoeffding bound",
+            )?;
+            bound = checked_add(bound, term, "linear-observable Hoeffding bound")?;
+        }
+        Ok(bound)
     }
 }
 
@@ -264,18 +295,24 @@ impl ShadowDataset {
             expected: self.snapshots.len(),
             actual: index.saturating_add(1),
         })?;
-        Ok(string_snapshot_estimate(snapshot, observable))
+        string_snapshot_estimate(snapshot, observable)
     }
 
     /// Returns the ordinary sample-mean estimate of a Pauli string.
+    ///
+    /// Returns [`ShadowError::NumericalOverflow`] if finite snapshot estimates
+    /// cannot be accumulated into a finite `f64` result.
     pub fn mean(&self, observable: &PauliString) -> Result<f64> {
         self.check_string(observable)?;
-        Ok(self
-            .snapshots
-            .iter()
-            .map(|snapshot| string_snapshot_estimate(snapshot, observable))
-            .sum::<f64>()
-            / self.snapshots.len() as f64)
+        let mut sum = 0.0;
+        for snapshot in &self.snapshots {
+            sum = checked_add(
+                sum,
+                string_snapshot_estimate(snapshot, observable)?,
+                "Pauli sample mean",
+            )?;
+        }
+        checked_finite(sum / self.snapshots.len() as f64, "Pauli sample mean")
     }
 
     /// Returns the estimated standard error of the sample mean.
@@ -287,16 +324,22 @@ impl ShadowDataset {
             return Ok(None);
         }
         let mean = self.mean(observable)?;
-        let squared_deviations: f64 = self
-            .snapshots
-            .iter()
-            .map(|snapshot| {
-                let residual = string_snapshot_estimate(snapshot, observable) - mean;
-                residual * residual
-            })
-            .sum();
+        let mut squared_deviations = 0.0;
+        for snapshot in &self.snapshots {
+            let residual = checked_finite(
+                string_snapshot_estimate(snapshot, observable)? - mean,
+                "Pauli standard error",
+            )?;
+            let square = checked_mul(residual, residual, "Pauli standard error")?;
+            squared_deviations = checked_add(squared_deviations, square, "Pauli standard error")?;
+        }
         let sample_variance = squared_deviations / (self.snapshots.len() - 1) as f64;
-        Ok(Some((sample_variance / self.snapshots.len() as f64).sqrt()))
+        checked_finite(sample_variance, "Pauli standard error")?;
+        let standard_error = (sample_variance / self.snapshots.len() as f64).sqrt();
+        Ok(Some(checked_finite(
+            standard_error,
+            "Pauli standard error",
+        )?))
     }
 
     /// Returns a deterministic median-of-means estimate.
@@ -313,31 +356,51 @@ impl ShadowDataset {
         for group in 0..groups {
             let length = base + usize::from(group < remainder);
             let end = start + length;
-            let mean = self.snapshots[start..end]
-                .iter()
-                .map(|snapshot| string_snapshot_estimate(snapshot, observable))
-                .sum::<f64>()
-                / length as f64;
-            means.push(mean);
+            let mut sum = 0.0;
+            for snapshot in &self.snapshots[start..end] {
+                sum = checked_add(
+                    sum,
+                    string_snapshot_estimate(snapshot, observable)?,
+                    "median-of-means group",
+                )?;
+            }
+            means.push(checked_finite(
+                sum / length as f64,
+                "median-of-means group",
+            )?);
             start = end;
         }
         means.sort_by(f64::total_cmp);
         if groups % 2 == 1 {
             Ok(means[groups / 2])
         } else {
-            Ok(0.5 * (means[groups / 2 - 1] + means[groups / 2]))
+            let middle = checked_add(
+                means[groups / 2 - 1],
+                means[groups / 2],
+                "median-of-means midpoint",
+            )?;
+            checked_finite(0.5 * middle, "median-of-means midpoint")
         }
     }
 
     /// Returns the sample-mean estimate of a linear Pauli observable.
+    ///
+    /// Non-finite term products or accumulation are reported as
+    /// [`ShadowError::NumericalOverflow`].
     pub fn observable_mean(&self, observable: &PauliObservable) -> Result<f64> {
         self.check_observable(observable)?;
-        Ok(self
-            .snapshots
-            .iter()
-            .map(|snapshot| observable_snapshot_estimate(snapshot, observable))
-            .sum::<f64>()
-            / self.snapshots.len() as f64)
+        let mut sum = 0.0;
+        for snapshot in &self.snapshots {
+            sum = checked_add(
+                sum,
+                observable_snapshot_estimate(snapshot, observable)?,
+                "linear-observable sample mean",
+            )?;
+        }
+        checked_finite(
+            sum / self.snapshots.len() as f64,
+            "linear-observable sample mean",
+        )
     }
 
     /// Returns a conservative two-sided Hoeffding radius for a Pauli string.
@@ -347,7 +410,7 @@ impl ShadowDataset {
     pub fn hoeffding_radius(&self, observable: &PauliString, delta: f64) -> Result<f64> {
         self.check_string(observable)?;
         validate_delta(delta)?;
-        Ok(observable.bound() * (2.0 * (2.0 / delta).ln() / self.snapshots.len() as f64).sqrt())
+        hoeffding_radius(observable.bound()?, delta, self.snapshots.len())
     }
 
     /// Returns the corresponding conservative radius for a linear observable.
@@ -358,7 +421,7 @@ impl ShadowDataset {
     ) -> Result<f64> {
         self.check_observable(observable)?;
         validate_delta(delta)?;
-        Ok(observable.bound() * (2.0 * (2.0 / delta).ln() / self.snapshots.len() as f64).sqrt())
+        hoeffding_radius(observable.bound()?, delta, self.snapshots.len())
     }
 
     fn check_string(&self, observable: &PauliString) -> Result<()> {
@@ -384,7 +447,7 @@ impl ShadowDataset {
     }
 }
 
-fn string_snapshot_estimate(snapshot: &Snapshot, observable: &PauliString) -> f64 {
+fn string_snapshot_estimate(snapshot: &Snapshot, observable: &PauliString) -> Result<f64> {
     let mut estimate = 1.0;
     for ((basis, outcome), factor) in snapshot
         .bases
@@ -396,19 +459,52 @@ fn string_snapshot_estimate(snapshot: &Snapshot, observable: &PauliString) -> f6
             continue;
         }
         if !basis.matches(*factor) {
-            return 0.0;
+            return Ok(0.0);
         }
-        estimate *= 3.0 * f64::from(*outcome);
+        estimate = checked_mul(
+            estimate,
+            3.0 * f64::from(*outcome),
+            "Pauli snapshot estimator",
+        )?;
     }
-    estimate
+    Ok(estimate)
 }
 
-fn observable_snapshot_estimate(snapshot: &Snapshot, observable: &PauliObservable) -> f64 {
-    observable
-        .terms
-        .iter()
-        .map(|(coefficient, string)| coefficient * string_snapshot_estimate(snapshot, string))
-        .sum()
+fn observable_snapshot_estimate(snapshot: &Snapshot, observable: &PauliObservable) -> Result<f64> {
+    let mut estimate = 0.0;
+    for (coefficient, string) in &observable.terms {
+        let term = checked_mul(
+            *coefficient,
+            string_snapshot_estimate(snapshot, string)?,
+            "linear-observable snapshot estimator",
+        )?;
+        estimate = checked_add(estimate, term, "linear-observable snapshot estimator")?;
+    }
+    Ok(estimate)
+}
+
+fn hoeffding_radius(bound: f64, delta: f64, samples: usize) -> Result<f64> {
+    // `ln(2 / delta)` is evaluated as `ln(2) - ln(delta)` so a valid
+    // subnormal delta cannot overflow during the intermediate division.
+    let logarithm = core::f64::consts::LN_2 - delta.ln();
+    let scale = (2.0 * logarithm / samples as f64).sqrt();
+    checked_mul(bound, scale, "Hoeffding radius")
+}
+
+fn checked_add(left: f64, right: f64, context: &'static str) -> Result<f64> {
+    checked_finite(left + right, context)
+}
+
+fn checked_mul(left: f64, right: f64, context: &'static str) -> Result<f64> {
+    checked_finite(left * right, context)
+}
+
+fn checked_finite(value: f64, context: &'static str) -> Result<f64> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(ShadowError::NumericalOverflow { context })
+    }
 }
 
 fn validate_groups(groups: usize, samples: usize) -> Result<()> {
@@ -512,6 +608,49 @@ mod tests {
                 .unwrap()
                 > 0.0
         );
+    }
+
+    #[test]
+    fn high_weight_and_non_finite_reductions_are_rejected() {
+        assert_eq!(
+            PauliString::try_new(vec![Pauli::X; MAX_FINITE_PAULI_WEIGHT + 1]),
+            Err(ShadowError::PauliWeightOverflow {
+                weight: MAX_FINITE_PAULI_WEIGHT + 1,
+                maximum: MAX_FINITE_PAULI_WEIGHT,
+            })
+        );
+
+        let boundary = PauliString::try_new(vec![Pauli::X; MAX_FINITE_PAULI_WEIGHT]).unwrap();
+        let snapshot = Snapshot::try_new(
+            vec![MeasurementBasis::X; MAX_FINITE_PAULI_WEIGHT],
+            vec![1; MAX_FINITE_PAULI_WEIGHT],
+        )
+        .unwrap();
+        let boundary_dataset =
+            ShadowDataset::try_new(MAX_FINITE_PAULI_WEIGHT, vec![snapshot]).unwrap();
+        assert!(boundary_dataset.mean(&boundary).unwrap().is_finite());
+        assert!(matches!(
+            boundary_dataset.hoeffding_radius(&boundary, 0.5),
+            Err(ShadowError::NumericalOverflow {
+                context: "Hoeffding radius"
+            })
+        ));
+
+        let one_qubit = ShadowDataset::try_new(
+            1,
+            vec![Snapshot::try_new(vec![MeasurementBasis::X], vec![1]).unwrap()],
+        )
+        .unwrap();
+        let x = PauliString::try_new(vec![Pauli::X]).unwrap();
+        let overflowing = PauliObservable::try_new(vec![(f64::MAX, x)]).unwrap();
+        assert!(matches!(
+            one_qubit.observable_mean(&overflowing),
+            Err(ShadowError::NumericalOverflow { .. })
+        ));
+        assert!(matches!(
+            one_qubit.observable_hoeffding_radius(&overflowing, 0.5),
+            Err(ShadowError::NumericalOverflow { .. })
+        ));
     }
 
     #[test]
