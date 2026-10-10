@@ -15,6 +15,7 @@ mod bivector;
 mod stepper;
 
 pub mod analysis;
+pub mod initial_conditions;
 
 pub use bivector::{
     chiral_split, BivectorField, BivectorField32, BivectorField64, BoundaryCondition,
