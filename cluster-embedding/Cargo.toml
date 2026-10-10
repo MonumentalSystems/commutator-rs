@@ -1,0 +1,25 @@
+[package]
+name = "cluster-embedding"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Checked VCA and DMFT embedding foundations with injected cluster solvers"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cluster-embedding"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["dmft", "vca", "hubbard", "green-function"]
+categories = ["science", "mathematics"]
+include = [
+    "src/**/*.rs",
+    "tests/**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
+
+[dependencies]
+cluster-green = { version = "0.1.0", path = "../cluster-green" }
+num-complex = "0.4"
