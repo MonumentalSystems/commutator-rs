@@ -1,7 +1,8 @@
 # quantum-magnetism
 
-`quantum-magnetism` is a dependency-free exact/reference toolkit for finite
-frustrated spin-1/2 models. It is intended for analytic checks, small-cluster
+`quantum-magnetism` is a small exact/reference toolkit for finite frustrated
+spin-1/2 models. Public amplitudes use `num_complex::Complex64` for direct
+interoperation with the Rust numerical ecosystem. It is intended for analytic checks, small-cluster
 studies, and validation of scalable solvers—not large many-body production
 runs.
 

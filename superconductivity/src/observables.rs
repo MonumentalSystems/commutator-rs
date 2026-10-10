@@ -50,7 +50,10 @@ impl BdGEigensystem {
                 index,
             });
         }
-        if let Some(index) = eigenvectors.iter().position(|entry| !entry.is_finite()) {
+        if let Some(index) = eigenvectors
+            .iter()
+            .position(|entry| !entry.re.is_finite() || !entry.im.is_finite())
+        {
             return Err(SuperconductivityError::NonFinite {
                 context: "eigenvectors",
                 index,
@@ -60,15 +63,15 @@ impl BdGEigensystem {
         let mut orthonormality_residual: f64 = 0.0;
         for left in 0..n {
             for right in 0..n {
-                let mut inner = Complex64::ZERO;
+                let mut inner = Complex64::new(0.0, 0.0);
                 for component in 0..n {
                     inner += eigenvectors[left * n + component].conj()
                         * eigenvectors[right * n + component];
                 }
                 let expected = if left == right {
-                    Complex64::ONE
+                    Complex64::new(1.0, 0.0)
                 } else {
-                    Complex64::ZERO
+                    Complex64::new(0.0, 0.0)
                 };
                 orthonormality_residual = orthonormality_residual.max((inner - expected).norm());
             }
@@ -177,8 +180,8 @@ impl BdGEigensystem {
         let orbitals = self.site_count * 2;
         let up = orbital_index(site, Spin::Up);
         let down = orbital_index(site, Spin::Down);
-        let mut up_down = Complex64::ZERO;
-        let mut down_up = Complex64::ZERO;
+        let mut up_down = Complex64::new(0.0, 0.0);
+        let mut down_up = Complex64::new(0.0, 0.0);
         for (eigenpair, &energy) in self.energies.iter().enumerate() {
             if energy <= 0.0 {
                 continue;
