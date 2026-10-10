@@ -643,13 +643,10 @@ fn beam_splitter_coefficient(
 ) -> f64 {
     let output_a = from_a_to_a + from_b_to_a;
     let output_b = n + m - output_a;
-    let combinatorial_log = ln_binomial(n, from_a_to_a)
-        + ln_binomial(m, from_b_to_a)
-        + ln_factorial(output_a)
-        + ln_factorial(output_b)
-        - ln_factorial(n)
-        - ln_factorial(m);
-    let combinatorial = (0.5 * combinatorial_log).exp();
+    let expansion_log = ln_binomial(n, from_a_to_a) + ln_binomial(m, from_b_to_a);
+    let normalization_log =
+        ln_factorial(output_a) + ln_factorial(output_b) - ln_factorial(n) - ln_factorial(m);
+    let combinatorial = (expansion_log + 0.5 * normalization_log).exp();
     let cosine_power = from_a_to_a + m - from_b_to_a;
     let sine_power = n - from_a_to_a + from_b_to_a;
     let sign = if from_b_to_a % 2 == 0 { 1.0 } else { -1.0 };
@@ -765,6 +762,26 @@ mod tests {
                 input.probability(&occupations).unwrap(),
                 output.probability(&occupations).unwrap(),
             );
+        }
+    }
+
+    #[test]
+    fn beam_splitter_is_unitary_on_every_representable_basis_sector() {
+        let space = FockSpace::try_new(2, 5).unwrap();
+        for n in 0..=5 {
+            for m in 0..=5 - n {
+                let input = StateVector::basis(space, &[n, m]).unwrap();
+                let output = input.beam_splitter(0, 1, 0.37).unwrap();
+                close(output.norm_squared(), 1.0);
+                let recovered = output.beam_splitter(0, 1, -0.37).unwrap();
+                for index in 0..space.dimension() {
+                    let occupations = space.occupations(index).unwrap();
+                    close(
+                        recovered.probability(&occupations).unwrap(),
+                        input.probability(&occupations).unwrap(),
+                    );
+                }
+            }
         }
     }
 
