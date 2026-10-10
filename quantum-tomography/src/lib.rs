@@ -30,6 +30,16 @@ pub enum TomographyError {
     InvalidTolerance,
     /// Underlying operator construction failed.
     Operator(String),
+    /// A named GST gate was not present in the model.
+    UnknownGate(String),
+    /// A GST outcome vector was not a finite normalized probability vector.
+    InvalidProbabilities,
+    /// Summing multinomial counts overflowed `u64`.
+    CountOverflow,
+    /// A gauge transformation was singular at its own numeric scale.
+    SingularGaugeTransform,
+    /// A Hermitian eigenvalue iteration did not converge.
+    EigensolverDidNotConverge,
 }
 impl fmt::Display for TomographyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -151,6 +161,10 @@ fn kron_pauli(s: &[Pauli]) -> Vec<Complex64> {
 }
 
 /// Linear-inverts all `4^n` Pauli expectations, identity first.
+///
+/// The identity expectation is validated against one and then pinned to one,
+/// so the returned Hermitian estimate has unit trace even when the supplied
+/// normalization differs within `tolerance`.
 pub fn linear_inversion(qubits: usize, expectations: &[f64], tolerance: f64) -> Result<Operator> {
     let (d, p) = count(qubits)?;
     if expectations.len() != p {
@@ -169,20 +183,37 @@ pub fn linear_inversion(qubits: usize, expectations: &[f64], tolerance: f64) -> 
         return Err(TomographyError::InvalidNormalization(expectations[0]));
     }
     let mut v = vec![0.0.into(); d * d];
-    for (e, s) in expectations.iter().zip(pauli_strings(qubits)) {
+    for (index, (e, s)) in expectations.iter().zip(pauli_strings(qubits)).enumerate() {
+        let expectation = if index == 0 { 1.0 } else { *e };
         for (i, x) in kron_pauli(&s).into_iter().enumerate() {
-            v[i] += x * (*e / d as f64);
+            v[i] += x * (expectation / d as f64);
         }
     }
     Ok(Operator::try_new(d, v)?)
 }
 
-fn eig(mut a: Vec<Complex64>, n: usize) -> (Vec<f64>, Vec<Complex64>) {
+fn eig(mut a: Vec<Complex64>, n: usize, tolerance: f64) -> Result<(Vec<f64>, Vec<Complex64>)> {
+    check_tol(tolerance)?;
+    let expected = n.checked_mul(n).ok_or(TomographyError::InvalidQubits)?;
+    if n == 0 || a.len() != expected {
+        return Err(TomographyError::Shape {
+            expected,
+            actual: a.len(),
+        });
+    }
+    let scale = a
+        .iter()
+        .fold(0.0_f64, |scale, value| scale.max(value.norm()))
+        .max(f64::MIN_POSITIVE);
     let mut v = vec![0.0.into(); n * n];
     for i in 0..n {
         v[i * n + i] = 1.0.into()
     }
-    for _ in 0..(128 * n * n) {
+    let maximum_rotations = 64usize
+        .checked_mul(n)
+        .and_then(|count| count.checked_mul(n))
+        .ok_or(TomographyError::InvalidQubits)?;
+    for _ in 0..maximum_rotations {
         let mut p = 0;
         let mut q = 1.min(n - 1);
         let mut best = 0.0;
@@ -195,56 +226,69 @@ fn eig(mut a: Vec<Complex64>, n: usize) -> (Vec<f64>, Vec<Complex64>) {
                 }
             }
         }
-        if best < 1e-13 {
-            break;
+        if best <= tolerance * scale {
+            let eigenvalues: Vec<_> = (0..n).map(|i| a[i * n + i].re).collect();
+            let mut order: Vec<_> = (0..n).collect();
+            order.sort_by(|&left, &right| eigenvalues[left].total_cmp(&eigenvalues[right]));
+            let sorted_values = order.iter().map(|&index| eigenvalues[index]).collect();
+            let mut sorted_vectors = vec![Complex64::new(0.0, 0.0); expected];
+            for (new_column, &old_column) in order.iter().enumerate() {
+                for row in 0..n {
+                    sorted_vectors[row * n + new_column] = v[row * n + old_column];
+                }
+            }
+            return Ok((sorted_values, sorted_vectors));
         }
         let z = a[p * n + q];
-        let phi = z.arg();
         let app = a[p * n + p].re;
         let aqq = a[q * n + q].re;
-        let theta = 0.5 * (2.0 * best).atan2(aqq - app);
-        let c = theta.cos();
-        let s = theta.sin();
-        let phase = Complex64::from_polar(1.0, phi);
-        let mut u = vec![0.0.into(); n * n];
-        for i in 0..n {
-            u[i * n + i] = 1.0.into()
+        let tau = (aqq - app) / (2.0 * best);
+        let tangent = if tau >= 0.0 {
+            1.0 / (tau + (1.0 + tau * tau).sqrt())
+        } else {
+            -1.0 / (-tau + (1.0 + tau * tau).sqrt())
+        };
+        let c = 1.0 / (1.0 + tangent * tangent).sqrt();
+        let s = tangent * c;
+        let phase = z / best;
+        for index in 0..n {
+            if index == p || index == q {
+                continue;
+            }
+            let aip = a[index * n + p];
+            let aiq = a[index * n + q];
+            let new_ip = aip * phase * c - aiq * s;
+            let new_iq = aip * phase * s + aiq * c;
+            a[index * n + p] = new_ip;
+            a[p * n + index] = new_ip.conj();
+            a[index * n + q] = new_iq;
+            a[q * n + index] = new_iq.conj();
         }
-        u[p * n + p] = c.into();
-        u[q * n + q] = c.into();
-        u[p * n + q] = phase * s;
-        u[q * n + p] = -phase.conj() * s;
-        let op = Operator::try_new(n, a).unwrap();
-        let ou = Operator::try_new(n, u.clone()).unwrap();
-        a = ou
-            .adjoint()
-            .multiply(&op)
-            .unwrap()
-            .multiply(&ou)
-            .unwrap()
-            .as_slice()
-            .to_vec();
-        v = Operator::try_new(n, v)
-            .unwrap()
-            .multiply(&ou)
-            .unwrap()
-            .as_slice()
-            .to_vec();
+        for row in 0..n {
+            let vip = v[row * n + p];
+            let viq = v[row * n + q];
+            v[row * n + p] = vip * phase * c - viq * s;
+            v[row * n + q] = vip * phase * s + viq * c;
+        }
+        a[p * n + p] = Complex64::new(c * c * app + s * s * aqq - 2.0 * c * s * best, 0.0);
+        a[q * n + q] = Complex64::new(s * s * app + c * c * aqq + 2.0 * c * s * best, 0.0);
+        a[p * n + q] = Complex64::new(0.0, 0.0);
+        a[q * n + p] = Complex64::new(0.0, 0.0);
     }
-    (0..n)
-        .map(|i| a[i * n + i].re)
-        .collect::<Vec<_>>()
-        .pipe(|w| (w, v))
+    Err(TomographyError::EigensolverDidNotConverge)
 }
-trait Pipe: Sized {
-    fn pipe<T>(self, f: impl FnOnce(Self) -> T) -> T {
-        f(self)
-    }
-}
-impl<T> Pipe for T {}
 
-/// Projects a Hermitian estimate onto positive-semidefinite trace-one states.
+/// Euclidean-projects a Hermitian estimate onto PSD, trace-one matrices.
+///
+/// Eigenvalues are projected onto the probability simplex by water filling;
+/// this is the Frobenius-norm projection, not clipping followed by rescaling.
 pub fn project_density(estimate: &Operator) -> Result<Operator> {
+    project_density_with_tolerance(estimate, 1.0e-12)
+}
+
+/// Euclidean-projects a Hermitian estimate with an explicit relative
+/// eigensolver tolerance.
+pub fn project_density_with_tolerance(estimate: &Operator, tolerance: f64) -> Result<Operator> {
     let n = estimate.dimension();
     let mut h = vec![0.0.into(); n * n];
     for i in 0..n {
@@ -252,21 +296,28 @@ pub fn project_density(estimate: &Operator) -> Result<Operator> {
             h[i * n + j] = (estimate.get(i, j).unwrap() + estimate.get(j, i).unwrap().conj()) * 0.5;
         }
     }
-    let (w, v) = eig(h, n);
-    let clipped: Vec<_> = w.into_iter().map(|x| x.max(0.0)).collect();
-    let sum: f64 = clipped.iter().sum();
-    if sum <= 1e-15 {
-        let mut values = vec![0.0.into(); n * n];
-        for index in 0..n {
-            values[index * n + index] = (1.0 / n as f64).into();
+    let (w, v) = eig(h, n, tolerance)?;
+    let mut descending = w.clone();
+    descending.sort_by(|left, right| right.total_cmp(left));
+    let mut cumulative = 0.0;
+    let mut active = 0usize;
+    for (index, &value) in descending.iter().enumerate() {
+        cumulative += value;
+        let threshold = (cumulative - 1.0) / (index + 1) as f64;
+        if value > threshold {
+            active = index + 1;
         }
-        return Ok(Operator::try_new(n, values)?);
     }
+    let threshold = (descending[..active].iter().sum::<f64>() - 1.0) / active as f64;
+    let projected: Vec<_> = w
+        .into_iter()
+        .map(|value| (value - threshold).max(0.0))
+        .collect();
     let mut out = vec![0.0.into(); n * n];
     for k in 0..n {
         for i in 0..n {
             for j in 0..n {
-                out[i * n + j] += v[i * n + k] * (clipped[k] / sum) * v[j * n + k].conj();
+                out[i * n + j] += v[i * n + k] * projected[k] * v[j * n + k].conj();
             }
         }
     }
@@ -283,9 +334,10 @@ impl PauliTransferMatrix {
     /// Constructs a checked PTM in row-major order.
     pub fn try_new(qubits: usize, values: Vec<f64>) -> Result<Self> {
         let (_, p) = count(qubits)?;
-        if values.len() != p * p {
+        let expected = p.checked_mul(p).ok_or(TomographyError::InvalidQubits)?;
+        if values.len() != expected {
             return Err(TomographyError::Shape {
-                expected: p * p,
+                expected,
                 actual: values.len(),
             });
         }
@@ -313,8 +365,9 @@ impl PauliTransferMatrix {
             .iter()
             .map(|s| kron_pauli(s))
             .collect();
-        let nd = d * d;
-        let mut c = vec![0.0.into(); nd * nd];
+        let nd = d.checked_mul(d).ok_or(TomographyError::InvalidQubits)?;
+        let choi_len = nd.checked_mul(nd).ok_or(TomographyError::InvalidQubits)?;
+        let mut c = vec![0.0.into(); choi_len];
         for i in 0..d {
             for j in 0..d {
                 for b in 0..p {
@@ -336,7 +389,7 @@ impl PauliTransferMatrix {
     pub fn is_completely_positive(&self, t: f64) -> Result<bool> {
         check_tol(t)?;
         let c = self.normalized_choi()?;
-        let (w, _) = eig(c.as_slice().to_vec(), c.dimension());
+        let (w, _) = eig(c.as_slice().to_vec(), c.dimension(), t)?;
         Ok(w.into_iter().all(|x| x >= -t))
     }
 }
@@ -428,13 +481,24 @@ impl GateSetModel {
                 .gates
                 .iter()
                 .find(|(n, _)| n == name)
-                .ok_or(TomographyError::InvalidNormalization(f64::NAN))?;
+                .ok_or_else(|| TomographyError::UnknownGate((*name).to_owned()))?;
             r = mat_vec(&g.1, &r, self.dimension);
         }
         Ok(self.effects.iter().map(|e| dot(e, &r)).collect())
     }
     /// Evaluates multinomial log-likelihood and saturated-model deviance.
     pub fn fit_diagnostics(&self, records: &[GstRecord]) -> Result<FitDiagnostics> {
+        self.fit_diagnostics_with_tolerance(records, 1.0e-10)
+    }
+
+    /// Evaluates multinomial diagnostics after checking each outcome vector
+    /// against an explicit probability-normalization tolerance.
+    pub fn fit_diagnostics_with_tolerance(
+        &self,
+        records: &[GstRecord],
+        tolerance: f64,
+    ) -> Result<FitDiagnostics> {
+        check_tol(tolerance)?;
         let mut ll = 0.0;
         let mut dev = 0.0;
         for record in records {
@@ -446,14 +510,31 @@ impl GateSetModel {
             }
             let names: Vec<_> = record.sequence.iter().map(String::as_str).collect();
             let probabilities = self.probabilities(&names)?;
-            let total = record.counts.iter().sum::<u64>() as f64;
+            if probabilities.iter().any(|probability| {
+                !probability.is_finite()
+                    || *probability < -tolerance
+                    || *probability > 1.0 + tolerance
+            }) || (probabilities.iter().sum::<f64>() - 1.0).abs() > tolerance
+            {
+                return Err(TomographyError::InvalidProbabilities);
+            }
+            let total_count = record
+                .counts
+                .iter()
+                .try_fold(0_u64, |total, &count| total.checked_add(count))
+                .ok_or(TomographyError::CountOverflow)?;
+            if total_count == 0 {
+                return Err(TomographyError::InvalidProbabilities);
+            }
+            let total = total_count as f64;
             for (&count, &probability) in record.counts.iter().zip(&probabilities) {
-                if probability <= 0.0 || !probability.is_finite() {
-                    return Err(TomographyError::InvalidNormalization(probability));
-                }
+                let probability = probability.clamp(0.0, 1.0);
                 let c = count as f64;
-                ll += c * probability.ln();
                 if c > 0.0 {
+                    if probability == 0.0 {
+                        return Err(TomographyError::InvalidProbabilities);
+                    }
+                    ll += c * probability.ln();
                     dev += 2.0 * c * (c / (total * probability)).ln();
                 }
             }
@@ -472,6 +553,9 @@ impl GateSetModel {
                 expected: n * n,
                 actual: transform.len(),
             });
+        }
+        if transform.iter().any(|value| !value.is_finite()) {
+            return Err(TomographyError::NonFinite);
         }
         let inverse = invert_real(transform, n)?;
         let state = mat_vec(transform, &self.state, n);
@@ -515,6 +599,13 @@ fn mat_mul(a: &[f64], b: &[f64], n: usize) -> Vec<f64> {
 }
 fn invert_real(a: &[f64], n: usize) -> Result<Vec<f64>> {
     let mut l = a.to_vec();
+    let scale = l
+        .iter()
+        .fold(0.0_f64, |scale, value| scale.max(value.abs()));
+    if scale == 0.0 || !scale.is_finite() {
+        return Err(TomographyError::SingularGaugeTransform);
+    }
+    let pivot_threshold = 64.0 * f64::EPSILON * n as f64 * scale;
     let mut r = vec![0.0; n * n];
     for i in 0..n {
         r[i * n + i] = 1.0
@@ -523,8 +614,8 @@ fn invert_real(a: &[f64], n: usize) -> Result<Vec<f64>> {
         let pivot = (k..n)
             .max_by(|&i, &j| l[i * n + k].abs().total_cmp(&l[j * n + k].abs()))
             .unwrap();
-        if l[pivot * n + k].abs() < 1e-14 {
-            return Err(TomographyError::InvalidNormalization(0.0));
+        if l[pivot * n + k].abs() <= pivot_threshold {
+            return Err(TomographyError::SingularGaugeTransform);
         }
         for j in 0..n {
             l.swap(k * n + j, pivot * n + j);

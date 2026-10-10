@@ -299,13 +299,32 @@ pub fn langreth_product(left: &KeldyshGreen, right: &KeldyshGreen) -> Result<Kel
 /// kernel `K=G0^R∘Sigma^R`, then forward-substituting the Volterra equation.
 /// Composite-trapezoid quadrature is used on every truncated interval. The
 /// dense reference algorithm scales as `O(N_t^3 n^3)` and stores `O(N_t^2 n^2)`
-/// complex numbers.
+/// complex numbers. Inputs are checked for retarded support with a default
+/// relative tolerance of `1e-12`.
+///
+/// This ordinary sampled-kernel equation cannot represent Dirac-delta,
+/// time-local self-energies; callers must incorporate those into the free
+/// inverse propagator or use a discretization with explicit delta weights.
 pub fn retarded_dyson(
     grid: &RealTimeGrid,
     free: &TwoTimeMatrix,
     self_energy: &TwoTimeMatrix,
 ) -> Result<TwoTimeMatrix> {
+    retarded_dyson_with_tolerance(grid, free, self_energy, 1.0e-12)
+}
+
+/// Solves the retarded Dyson equation with an explicit scale-relative causal
+/// support tolerance.
+pub fn retarded_dyson_with_tolerance(
+    grid: &RealTimeGrid,
+    free: &TwoTimeMatrix,
+    self_energy: &TwoTimeMatrix,
+    tolerance: f64,
+) -> Result<TwoTimeMatrix> {
     validate_inputs(grid, free, self_energy)?;
+    validate_tolerance(tolerance)?;
+    validate_retarded_support(free, "free retarded propagator", tolerance)?;
+    validate_retarded_support(self_energy, "retarded self-energy", tolerance)?;
     let kernel = causal_volterra_convolution(grid, free, self_energy)?;
     let mut rows: Vec<Vec<DenseMatrix>> = (0..grid.len())
         .map(|_| (0..grid.len()).map(|_| zero(free.orbitals)).collect())
@@ -331,6 +350,33 @@ pub fn retarded_dyson(
     TwoTimeMatrix::try_from_fn(grid.len(), free.orbitals, |first, second| {
         Ok(rows[first][second].clone())
     })
+}
+
+fn validate_retarded_support(
+    function: &TwoTimeMatrix,
+    name: &'static str,
+    tolerance: f64,
+) -> Result<()> {
+    let scale = function
+        .values
+        .iter()
+        .map(matrix_norm_max)
+        .fold(0.0_f64, f64::max)
+        .max(f64::MIN_POSITIVE);
+    for first in 0..function.time_points {
+        for second in first + 1..function.time_points {
+            let relative_residual = matrix_norm_max(function.get(first, second)?) / scale;
+            if relative_residual > tolerance {
+                return Err(KeldyshError::AcausalRetardedInput {
+                    name,
+                    first,
+                    second,
+                    relative_residual,
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 fn anti_causal_convolution(

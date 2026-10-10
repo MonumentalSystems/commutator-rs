@@ -46,10 +46,16 @@ pub enum KeldyshError {
     InvalidTolerance,
     /// Components did not use the same grid or orbital dimension.
     Incompatible(&'static str),
-    /// Matrix inversion failed in a Dyson step.
-    SingularDysonStep {
-        /// Time index at which the solve failed.
-        time_index: usize,
+    /// A retarded Dyson input had support above the causal diagonal.
+    AcausalRetardedInput {
+        /// Name of the offending input.
+        name: &'static str,
+        /// First time index.
+        first: usize,
+        /// Second time index.
+        second: usize,
+        /// Scale-relative support residual.
+        relative_residual: f64,
     },
     /// A one-body observable was not real within tolerance.
     NonRealObservable {
@@ -94,9 +100,15 @@ impl fmt::Display for KeldyshError {
             Self::SizeOverflow => write!(f, "dimension product overflows usize"),
             Self::InvalidTolerance => write!(f, "tolerance must be finite and positive"),
             Self::Incompatible(name) => write!(f, "incompatible {name}"),
-            Self::SingularDysonStep { time_index } => {
-                write!(f, "singular retarded Dyson step at time index {time_index}")
-            }
+            Self::AcausalRetardedInput {
+                name,
+                first,
+                second,
+                relative_residual,
+            } => write!(
+                f,
+                "{name} has acausal support at ({first}, {second}) with relative residual {relative_residual}"
+            ),
             Self::NonRealObservable { imaginary } => {
                 write!(f, "observable has residual imaginary component {imaginary}")
             }

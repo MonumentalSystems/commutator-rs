@@ -28,6 +28,9 @@ impl RealTimeGrid {
         for index in 1..last {
             weights[index] = 0.5 * (times[index + 1] - times[index - 1]);
         }
+        if weights.iter().any(|weight| !weight.is_finite()) {
+            return Err(KeldyshError::NonFinite("real-time quadrature weights"));
+        }
         Ok(Self { times, weights })
     }
 

@@ -2,7 +2,7 @@
 
 Small checked reference and interoperability tools for local-Pauli state
 tomography and Pauli-transfer-matrix channel diagnostics. It provides complete
-measurement plans, linear inversion, physical-state projection, normalized
+measurement plans, trace-one linear inversion, Euclidean PSD trace-one projection, normalized
 Choi conversion, and TP/unital/CP checks.
 It also includes a focused PTM gate-set model, sequence probabilities,
 multinomial likelihood/deviance records, and probability-preserving similarity
@@ -12,7 +12,9 @@ This crate intentionally does not duplicate qtool's optimization-based FISTA
 quantum process tomography. Dense storage and the dependency-light Hermitian
 QR eigensolver target small systems, validation, and interchange boundaries.
 Production reconstruction should use specialized maximum-likelihood or convex
-solvers and preserve these conventions at the boundary.
+solvers and preserve these conventions at the boundary. The internal complex
+Hermitian Jacobi solver uses a caller-controlled, scale-relative convergence
+threshold and reports non-convergence.
 Gate-set parameter optimization is deliberately injected by callers; this
 crate supplies the checked model and objective diagnostics, not a turnkey
 nonlinear optimizer.

@@ -28,6 +28,35 @@ fn noisy_projection() {
     close(p.get(0, 0).unwrap(), 1.0.into());
     close(p.get(1, 1).unwrap(), 0.0.into());
 }
+
+#[test]
+fn projection_uses_trace_one_simplex_not_clipping_rescale() {
+    let estimate = Operator::try_new(
+        3,
+        vec![
+            0.8.into(),
+            0.0.into(),
+            0.0.into(),
+            0.0.into(),
+            0.3.into(),
+            0.0.into(),
+            0.0.into(),
+            0.0.into(),
+            (-0.1).into(),
+        ],
+    )
+    .unwrap();
+    let projected = project_density_with_tolerance(&estimate, 1e-12).unwrap();
+    close(projected.get(0, 0).unwrap(), 0.75.into());
+    close(projected.get(1, 1).unwrap(), 0.25.into());
+    close(projected.get(2, 2).unwrap(), 0.0.into());
+}
+
+#[test]
+fn accepted_identity_expectation_is_pinned_to_unit_trace() {
+    let estimate = linear_inversion(1, &[1.0 + 5e-10, 0.0, 0.0, 1.0], 1e-9).unwrap();
+    close(estimate.trace(), 1.0.into());
+}
 #[test]
 fn identity_and_depolarizing_channels() {
     let id = PauliTransferMatrix::try_new(
@@ -82,4 +111,53 @@ fn gst_probabilities_are_similarity_gauge_invariant() {
         }])
         .unwrap();
     assert!(metrics.log_likelihood.is_finite() && metrics.deviance >= 0.0);
+}
+
+#[test]
+fn gst_validates_probabilities_zeros_and_count_overflow() {
+    let structural_zero =
+        GateSetModel::try_new(vec![1.0], vec![vec![0.0], vec![1.0]], vec![]).unwrap();
+    let diagnostics = structural_zero
+        .fit_diagnostics(&[GstRecord {
+            sequence: vec![],
+            counts: vec![0, 10],
+        }])
+        .unwrap();
+    assert_eq!(diagnostics.log_likelihood, 0.0);
+    assert_eq!(diagnostics.deviance, 0.0);
+
+    let unnormalized =
+        GateSetModel::try_new(vec![1.0], vec![vec![0.8], vec![0.8]], vec![]).unwrap();
+    assert_eq!(
+        unnormalized.fit_diagnostics(&[GstRecord {
+            sequence: vec![],
+            counts: vec![5, 5],
+        }]),
+        Err(TomographyError::InvalidProbabilities)
+    );
+
+    let fair = GateSetModel::try_new(vec![1.0], vec![vec![0.5], vec![0.5]], vec![]).unwrap();
+    assert_eq!(
+        fair.fit_diagnostics(&[GstRecord {
+            sequence: vec![],
+            counts: vec![u64::MAX, 1],
+        }]),
+        Err(TomographyError::CountOverflow)
+    );
+}
+
+#[test]
+fn globally_small_invertible_gauge_is_scale_invariant() {
+    let model = GateSetModel::try_new(
+        vec![1.0, 0.2],
+        vec![vec![0.5, 0.5], vec![0.5, -0.5]],
+        vec![],
+    )
+    .unwrap();
+    let gauged = model.gauge_transform(&[1e-20, 0.0, 0.0, 2e-20]).unwrap();
+    let original = model.probabilities(&[]).unwrap();
+    let transformed = gauged.probabilities(&[]).unwrap();
+    for (left, right) in original.iter().zip(transformed) {
+        assert!((left - right).abs() < 1e-12);
+    }
 }

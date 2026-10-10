@@ -47,6 +47,14 @@ orbital `a` from `b`,
 `2(q/hbar) Im[h_ab rho_ba]`; its orientation and physical prefactor are never
 implicit.
 
+Retarded and advanced fixtures use the symmetric equal-time convention
+`theta(0)=1/2`. A zero-length Volterra interval has zero quadrature measure.
+Consequently the sampled ordinary-kernel Dyson solver cannot represent a
+Dirac-delta time-local self-energy; fold such a term into the free inverse
+propagator or use a discretization that carries explicit delta weights.
+Dyson inputs with support above the retarded diagonal are rejected instead of
+being silently projected onto their causal triangles.
+
 This is a transparent reference implementation. Storing a component costs
 `O(N_t^2 n^2)` and direct dense convolution/Dyson work costs
 `O(N_t^3 n^3)` for `N_t` time points and `n` orbitals. It is suitable for

@@ -81,6 +81,31 @@ fn zero_self_energy_dyson_returns_free_propagator() {
 }
 
 #[test]
+fn dyson_rejects_acausal_retarded_input() {
+    let grid = RealTimeGrid::try_new(vec![0.0, 0.5, 1.0]).unwrap();
+    let free = scalar_function(grid.len(), |i, j| {
+        if i >= j || (i == 0 && j == 1) {
+            1.0.into()
+        } else {
+            0.0.into()
+        }
+    });
+    let zeros = scalar_function(grid.len(), |_, _| 0.0.into());
+    assert!(matches!(
+        retarded_dyson(&grid, &free, &zeros),
+        Err(KeldyshError::AcausalRetardedInput { .. })
+    ));
+}
+
+#[test]
+fn grid_rejects_nonfinite_derived_weights() {
+    assert_eq!(
+        RealTimeGrid::try_new(vec![-f64::MAX, f64::MAX]),
+        Err(KeldyshError::NonFinite("real-time quadrature weights"))
+    );
+}
+
+#[test]
 fn volterra_dyson_matches_constant_kernel_analytic_limit() {
     let times: Vec<_> = (0..41).map(|index| index as f64 / 40.0).collect();
     let grid = RealTimeGrid::try_new(times).unwrap();

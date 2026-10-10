@@ -5,6 +5,9 @@
 //! `G^>(t,t') = -i <c(t) c†(t')>`.  It is intended as a checked reference
 //! layer: two-time storage is quadratic in the number of time points and the
 //! direct convolution and Dyson algorithms are cubic in that number.
+//! Retarded/advanced fixtures use the symmetric convention `theta(0)=1/2`.
+//! A zero-length Volterra interval has zero quadrature measure, so sampled
+//! ordinary kernels do not encode Dirac-delta time-local terms.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -19,8 +22,8 @@ pub use cluster_green::{Complex64, DenseMatrix};
 pub use error::KeldyshError;
 pub use grid::RealTimeGrid;
 pub use keldysh::{
-    causal_volterra_convolution, langreth_product, retarded_dyson, time_convolution,
-    ConsistencyReport, KeldyshGreen, TwoTimeMatrix,
+    causal_volterra_convolution, langreth_product, retarded_dyson, retarded_dyson_with_tolerance,
+    time_convolution, ConsistencyReport, KeldyshGreen, TwoTimeMatrix,
 };
 pub use observables::{bond_flow_into, density_matrix, one_body_expectation, particle_number};
 
