@@ -1,0 +1,27 @@
+[package]
+name = "majorana-fermions"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Sparse Majorana and fermionic operator algebra for quantum lattice models"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/majorana-fermions"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["majorana", "fermion", "clifford-algebra", "kitaev", "quantum"]
+categories = ["mathematics", "science", "simulation"]
+include = [
+    "src/**/*.rs",
+    "tests/**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
+
+[dependencies]
+num-complex = "0.4"
+
+[dev-dependencies]
+clifford-core = { version = "0.1.0", path = "../clifford-core" }

@@ -1,0 +1,25 @@
+[package]
+name = "quantum-light"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Checked finite-Fock-space reference kernels for quantum photonics"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/quantum-light"
+readme = "README.md"
+publish = ["crates-io"]
+keywords = ["quantum", "photonics", "fock", "optics", "boson"]
+categories = ["science", "simulation"]
+include = [
+    "src/**/*.rs",
+    "tests/**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
+
+[dependencies]
+num-complex = "0.4.6"
+
