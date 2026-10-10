@@ -226,3 +226,86 @@ fn globally_small_invertible_gauge_is_scale_invariant() {
         assert!((left - right).abs() < 1e-12);
     }
 }
+
+#[test]
+fn gst_reconstruction_recovers_identifiable_synthetic_gate_coordinate() {
+    let initial = GateSetModel::try_new(
+        vec![1.0, 0.8],
+        vec![vec![0.5, 0.5], vec![0.5, -0.5]],
+        vec![("g".into(), vec![1.0, 0.0, 0.0, 0.2])],
+    )
+    .unwrap();
+    let records = vec![
+        GstRecord {
+            sequence: vec!["g".into()],
+            counts: vec![7800, 2200],
+        },
+        GstRecord {
+            sequence: vec!["g".into(), "g".into()],
+            counts: vec![6960, 3040],
+        },
+    ];
+    let parameter = GstParameter::Gate {
+        name: "g".into(),
+        row: 1,
+        column: 1,
+    };
+    let config = GstOptimizerConfig {
+        initial_step: 0.01,
+        finite_difference_step: 1.0e-6,
+        gradient_tolerance: 1.0e-6,
+        objective_tolerance: 1.0e-11,
+        ..GstOptimizerConfig::default()
+    };
+    let result = reconstruct_gate_set(&initial, &records, &[parameter], config).unwrap();
+    assert!(result.converged(), "{:?}", result.termination());
+    assert!(result.final_fit().deviance < result.initial_fit().deviance);
+    let probabilities = result.model().probabilities(&["g"]).unwrap();
+    assert!((probabilities[0] - 0.78).abs() < 2.0e-4);
+    assert!((result.model().probabilities(&["g", "g"]).unwrap()[0] - 0.696).abs() < 2.0e-4);
+}
+
+#[test]
+fn gst_reconstruction_checks_chart_and_reports_iteration_limit() {
+    let model = GateSetModel::try_new(
+        vec![1.0, 0.2],
+        vec![vec![0.5, 0.5], vec![0.5, -0.5]],
+        vec![("g".into(), vec![1.0, 0.0, 0.0, 0.5])],
+    )
+    .unwrap();
+    let records = [GstRecord {
+        sequence: vec!["g".into()],
+        counts: vec![60, 40],
+    }];
+    let parameter = GstParameter::Gate {
+        name: "g".into(),
+        row: 1,
+        column: 1,
+    };
+    assert!(matches!(
+        reconstruct_gate_set(
+            &model,
+            &records,
+            &[parameter.clone(), parameter],
+            GstOptimizerConfig::default()
+        ),
+        Err(TomographyError::InvalidGstOptimization(_))
+    ));
+    let result = reconstruct_gate_set(
+        &model,
+        &records,
+        &[GstParameter::Gate {
+            name: "g".into(),
+            row: 1,
+            column: 1,
+        }],
+        GstOptimizerConfig {
+            max_iterations: 1,
+            objective_tolerance: 1.0e-30,
+            ..GstOptimizerConfig::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(result.termination(), GstTermination::MaximumIterations);
+    assert_eq!(result.iterations(), 1);
+}

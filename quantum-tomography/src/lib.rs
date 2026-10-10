@@ -42,6 +42,10 @@ pub enum TomographyError {
     SingularProcessDesign,
     /// A Hermitian eigenvalue iteration did not converge.
     EigensolverDidNotConverge,
+    /// GST optimization controls or parameter selection were invalid.
+    InvalidGstOptimization(&'static str),
+    /// A selected GST parameter was outside the model or named an absent gate.
+    InvalidGstParameter,
 }
 impl fmt::Display for TomographyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -556,6 +560,136 @@ pub struct FitDiagnostics {
     pub deviance: f64,
 }
 
+/// One explicitly selected coordinate in a GST model.
+///
+/// Selecting coordinates is the gauge-fixing boundary: GST data determine a
+/// gate set only up to similarity transforms. Callers should select an
+/// identifiable coordinate chart or first transform the initial model into a
+/// chosen gauge with [`GateSetModel::gauge_transform`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GstParameter {
+    /// One prepared-state vector entry.
+    State(usize),
+    /// One POVM-effect vector entry.
+    Effect {
+        /// Outcome/effect index.
+        outcome: usize,
+        /// Vector-entry index.
+        index: usize,
+    },
+    /// One row-major gate-matrix entry.
+    Gate {
+        /// Stable gate name.
+        name: String,
+        /// Matrix row.
+        row: usize,
+        /// Matrix column.
+        column: usize,
+    },
+}
+
+/// Deterministic finite-difference GST reconstruction controls.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GstOptimizerConfig {
+    /// Maximum accepted optimization iterations.
+    pub max_iterations: usize,
+    /// Initial gradient-descent step used by backtracking.
+    pub initial_step: f64,
+    /// Central finite-difference displacement per selected coordinate.
+    pub finite_difference_step: f64,
+    /// Euclidean gradient norm required for convergence.
+    pub gradient_tolerance: f64,
+    /// Minimum objective decrease treated as progress.
+    pub objective_tolerance: f64,
+    /// Probability validation tolerance passed to the likelihood evaluator.
+    pub probability_tolerance: f64,
+    /// Maximum deterministic step halvings per iteration.
+    pub max_backtracks: usize,
+    /// Quadratic gauge/chart anchor strength relative to the initial model.
+    /// Zero disables anchoring; positive values stabilize weakly identified
+    /// selected coordinates but introduce an explicit prior.
+    pub anchor_strength: f64,
+}
+
+impl Default for GstOptimizerConfig {
+    fn default() -> Self {
+        Self {
+            max_iterations: 200,
+            initial_step: 0.1,
+            finite_difference_step: 1.0e-5,
+            gradient_tolerance: 1.0e-8,
+            objective_tolerance: 1.0e-12,
+            probability_tolerance: 1.0e-9,
+            max_backtracks: 24,
+            anchor_strength: 0.0,
+        }
+    }
+}
+
+/// Why deterministic GST reconstruction stopped.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GstTermination {
+    /// The selected-coordinate gradient met its tolerance.
+    GradientTolerance,
+    /// An accepted step changed the objective by at most its tolerance.
+    ObjectiveTolerance,
+    /// The configured iteration limit was reached.
+    MaximumIterations,
+    /// Backtracking found no finite, improving model.
+    LineSearchStalled,
+}
+
+/// Checked outcome of a GST reconstruction.
+#[derive(Clone, Debug, PartialEq)]
+pub struct GstReconstruction {
+    model: GateSetModel,
+    initial: FitDiagnostics,
+    final_fit: FitDiagnostics,
+    iterations: usize,
+    objective: f64,
+    gradient_norm: f64,
+    termination: GstTermination,
+}
+
+impl GstReconstruction {
+    /// Reconstructed gate-set model in the caller-selected gauge/chart.
+    pub const fn model(&self) -> &GateSetModel {
+        &self.model
+    }
+    /// Initial multinomial diagnostics.
+    pub const fn initial_fit(&self) -> FitDiagnostics {
+        self.initial
+    }
+    /// Final multinomial diagnostics.
+    pub const fn final_fit(&self) -> FitDiagnostics {
+        self.final_fit
+    }
+    /// Number of accepted iterations.
+    pub const fn iterations(&self) -> usize {
+        self.iterations
+    }
+    /// Final penalized negative log-likelihood objective.
+    pub const fn objective(&self) -> f64 {
+        self.objective
+    }
+    /// Final selected-coordinate gradient norm.
+    pub const fn gradient_norm(&self) -> f64 {
+        self.gradient_norm
+    }
+    /// Deterministic stopping reason.
+    pub const fn termination(&self) -> GstTermination {
+        self.termination
+    }
+    /// Whether a numerical convergence tolerance, rather than a limit or
+    /// stalled line search, stopped the fit.
+    pub const fn converged(&self) -> bool {
+        matches!(
+            self.termination,
+            GstTermination::GradientTolerance | GstTermination::ObjectiveTolerance
+        )
+    }
+}
+
 /// A checked PTM gate-set model for focused gate-set tomography interoperation.
 #[derive(Clone, Debug, PartialEq)]
 pub struct GateSetModel {
@@ -602,6 +736,13 @@ impl GateSetModel {
                     .find(|(_, g)| g.len() != square)
                     .map_or(0, |(_, g)| g.len()),
             });
+        }
+        for (index, (name, _)) in gates.iter().enumerate() {
+            if name.is_empty() || gates[..index].iter().any(|(prior, _)| prior == name) {
+                return Err(TomographyError::InvalidGstOptimization(
+                    "gate names must be nonempty and unique",
+                ));
+            }
         }
         Ok(Self {
             dimension,
@@ -712,6 +853,299 @@ impl GateSetModel {
         Self::try_new(state, effects, gates)
     }
 }
+
+/// Reconstruct selected, gauge-fixed GST coordinates by deterministic
+/// finite-difference maximum likelihood with backtracking.
+///
+/// This routine is intentionally a small-system reference optimizer. It does
+/// not pretend to solve GST's similarity-gauge ambiguity: `parameters`
+/// explicitly defines the caller's coordinate chart, while `anchor_strength`
+/// optionally records a quadratic prior around the initial representative.
+/// Unselected coordinates remain exactly fixed. Every accepted model must
+/// produce finite, normalized probabilities for every supplied sequence.
+pub fn reconstruct_gate_set(
+    initial: &GateSetModel,
+    records: &[GstRecord],
+    parameters: &[GstParameter],
+    config: GstOptimizerConfig,
+) -> Result<GstReconstruction> {
+    validate_optimizer_config(config)?;
+    if records.is_empty() {
+        return Err(TomographyError::InvalidGstOptimization(
+            "at least one GST record is required",
+        ));
+    }
+    if parameters.is_empty() {
+        return Err(TomographyError::InvalidGstOptimization(
+            "at least one GST parameter is required",
+        ));
+    }
+    for (index, parameter) in parameters.iter().enumerate() {
+        if parameters[..index].contains(parameter) {
+            return Err(TomographyError::InvalidGstOptimization(
+                "GST parameters must be unique",
+            ));
+        }
+        parameter_value(initial, parameter)?;
+    }
+
+    let initial_fit =
+        initial.fit_diagnostics_with_tolerance(records, config.probability_tolerance)?;
+    let anchor: Vec<_> = parameters
+        .iter()
+        .map(|parameter| parameter_value(initial, parameter))
+        .collect::<Result<_>>()?;
+    let mut coordinates = anchor.clone();
+    let mut model = initial.clone();
+    let mut final_fit = initial_fit;
+    let mut objective =
+        penalized_objective(final_fit, &coordinates, &anchor, config.anchor_strength);
+    let mut accepted_iterations = 0usize;
+    let mut termination = GstTermination::MaximumIterations;
+
+    for _ in 0..config.max_iterations {
+        let gradient = finite_difference_gradient(
+            initial,
+            records,
+            parameters,
+            &coordinates,
+            &anchor,
+            config,
+            objective,
+        )?;
+        let gradient_norm = gradient
+            .iter()
+            .map(|value| value * value)
+            .sum::<f64>()
+            .sqrt();
+        if gradient_norm <= config.gradient_tolerance {
+            termination = GstTermination::GradientTolerance;
+            break;
+        }
+
+        let mut step = config.initial_step;
+        let mut accepted = None;
+        for _ in 0..config.max_backtracks {
+            let trial: Vec<_> = coordinates
+                .iter()
+                .zip(&gradient)
+                .map(|(coordinate, derivative)| coordinate - step * derivative)
+                .collect();
+            if let Some(candidate) =
+                evaluate_coordinates(initial, records, parameters, &trial, &anchor, config)?
+            {
+                if candidate.0 < objective {
+                    accepted = Some((trial, candidate));
+                    break;
+                }
+            }
+            step *= 0.5;
+        }
+        let Some((trial, (trial_objective, trial_fit, trial_model))) = accepted else {
+            termination = GstTermination::LineSearchStalled;
+            break;
+        };
+        let improvement = objective - trial_objective;
+        coordinates = trial;
+        objective = trial_objective;
+        final_fit = trial_fit;
+        model = trial_model;
+        accepted_iterations += 1;
+        if improvement <= config.objective_tolerance {
+            termination = GstTermination::ObjectiveTolerance;
+            break;
+        }
+    }
+
+    if accepted_iterations == config.max_iterations {
+        termination = GstTermination::MaximumIterations;
+    }
+    let final_gradient = finite_difference_gradient(
+        initial,
+        records,
+        parameters,
+        &coordinates,
+        &anchor,
+        config,
+        objective,
+    )?;
+    let gradient_norm = final_gradient
+        .iter()
+        .map(|value| value * value)
+        .sum::<f64>()
+        .sqrt();
+    Ok(GstReconstruction {
+        model,
+        initial: initial_fit,
+        final_fit,
+        iterations: accepted_iterations,
+        objective,
+        gradient_norm,
+        termination,
+    })
+}
+
+fn validate_optimizer_config(config: GstOptimizerConfig) -> Result<()> {
+    let positive = [
+        config.initial_step,
+        config.finite_difference_step,
+        config.gradient_tolerance,
+        config.objective_tolerance,
+        config.probability_tolerance,
+    ];
+    if config.max_iterations == 0
+        || config.max_backtracks == 0
+        || positive
+            .iter()
+            .any(|value| !value.is_finite() || *value <= 0.0)
+        || !config.anchor_strength.is_finite()
+        || config.anchor_strength < 0.0
+    {
+        Err(TomographyError::InvalidGstOptimization(
+            "optimizer controls must be finite and positive",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn parameter_value(model: &GateSetModel, parameter: &GstParameter) -> Result<f64> {
+    match parameter {
+        GstParameter::State(index) => model.state.get(*index).copied(),
+        GstParameter::Effect { outcome, index } => model
+            .effects
+            .get(*outcome)
+            .and_then(|effect| effect.get(*index))
+            .copied(),
+        GstParameter::Gate { name, row, column } => model
+            .gates
+            .iter()
+            .find(|(gate_name, _)| gate_name == name)
+            .and_then(|(_, gate)| {
+                row.checked_mul(model.dimension)
+                    .and_then(|offset| offset.checked_add(*column))
+                    .and_then(|index| gate.get(index))
+            })
+            .copied(),
+    }
+    .ok_or(TomographyError::InvalidGstParameter)
+}
+
+fn model_with_coordinates(
+    initial: &GateSetModel,
+    parameters: &[GstParameter],
+    coordinates: &[f64],
+) -> Result<GateSetModel> {
+    let mut model = initial.clone();
+    for (parameter, &value) in parameters.iter().zip(coordinates) {
+        if !value.is_finite() {
+            return Err(TomographyError::NonFinite);
+        }
+        match parameter {
+            GstParameter::State(index) => {
+                *model
+                    .state
+                    .get_mut(*index)
+                    .ok_or(TomographyError::InvalidGstParameter)? = value
+            }
+            GstParameter::Effect { outcome, index } => {
+                *model
+                    .effects
+                    .get_mut(*outcome)
+                    .and_then(|effect| effect.get_mut(*index))
+                    .ok_or(TomographyError::InvalidGstParameter)? = value;
+            }
+            GstParameter::Gate { name, row, column } => {
+                let index = row
+                    .checked_mul(model.dimension)
+                    .and_then(|offset| offset.checked_add(*column))
+                    .ok_or(TomographyError::InvalidGstParameter)?;
+                let gate = model
+                    .gates
+                    .iter_mut()
+                    .find(|(gate_name, _)| gate_name == name)
+                    .ok_or(TomographyError::InvalidGstParameter)?;
+                *gate
+                    .1
+                    .get_mut(index)
+                    .ok_or(TomographyError::InvalidGstParameter)? = value;
+            }
+        }
+    }
+    Ok(model)
+}
+
+fn penalized_objective(
+    fit: FitDiagnostics,
+    coordinates: &[f64],
+    anchor: &[f64],
+    anchor_strength: f64,
+) -> f64 {
+    -fit.log_likelihood
+        + 0.5
+            * anchor_strength
+            * coordinates
+                .iter()
+                .zip(anchor)
+                .map(|(value, origin)| (value - origin).powi(2))
+                .sum::<f64>()
+}
+
+fn evaluate_coordinates(
+    initial: &GateSetModel,
+    records: &[GstRecord],
+    parameters: &[GstParameter],
+    coordinates: &[f64],
+    anchor: &[f64],
+    config: GstOptimizerConfig,
+) -> Result<Option<(f64, FitDiagnostics, GateSetModel)>> {
+    let model = model_with_coordinates(initial, parameters, coordinates)?;
+    match model.fit_diagnostics_with_tolerance(records, config.probability_tolerance) {
+        Ok(fit) => Ok(Some((
+            penalized_objective(fit, coordinates, anchor, config.anchor_strength),
+            fit,
+            model,
+        ))),
+        Err(TomographyError::InvalidProbabilities) => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn finite_difference_gradient(
+    initial: &GateSetModel,
+    records: &[GstRecord],
+    parameters: &[GstParameter],
+    coordinates: &[f64],
+    anchor: &[f64],
+    config: GstOptimizerConfig,
+    objective: f64,
+) -> Result<Vec<f64>> {
+    let mut gradient = Vec::with_capacity(coordinates.len());
+    for index in 0..coordinates.len() {
+        let displacement = config.finite_difference_step * coordinates[index].abs().max(1.0);
+        let mut plus = coordinates.to_vec();
+        let mut minus = coordinates.to_vec();
+        plus[index] += displacement;
+        minus[index] -= displacement;
+        let positive = evaluate_coordinates(initial, records, parameters, &plus, anchor, config)?;
+        let negative = evaluate_coordinates(initial, records, parameters, &minus, anchor, config)?;
+        let derivative = match (positive, negative) {
+            (Some((right, _, _)), Some((left, _, _))) => (right - left) / (2.0 * displacement),
+            (Some((right, _, _)), None) => (right - objective) / displacement,
+            (None, Some((left, _, _))) => (objective - left) / displacement,
+            (None, None) => 0.0,
+        };
+        if !derivative.is_finite() {
+            return Err(TomographyError::InvalidGstOptimization(
+                "finite-difference gradient was non-finite",
+            ));
+        }
+        gradient.push(derivative);
+    }
+    Ok(gradient)
+}
+
 fn dot(a: &[f64], b: &[f64]) -> f64 {
     a.iter().zip(b).map(|(x, y)| x * y).sum()
 }
