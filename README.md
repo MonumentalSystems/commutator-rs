@@ -12,6 +12,7 @@ or volunteer-computing backends.
 
 | Crate | Purpose | Runtime dependencies |
 | --- | --- | --- |
+| [`berry-response`](berry-response) | Checked SI dipoles, ordered/symmetric Hall response, harmonic amplitudes, and open-circuit measurement conversion (workspace-only reference) | `num-complex` |
 | [`clifford-core`](clifford-core) | Runtime-signature `Cl(p,q)`, geometric products, grades, rotors, and frozen cross-implementation conventions | none |
 | [`clifford-field`](clifford-field) | Cl(1,3) field storage, checked analytic initial conditions, boundary operators, reference steppers, and portable numerical analysis | `clifford-core`, Rayon, Serde |
 | [`clifford-geometry`](clifford-geometry) | Fixed-size EGA, PGA, CGA, STA, and Cl(6,0) geometry with motors, conformal primitives, frames, and kinematic chains | `clifford-core` |
@@ -42,6 +43,17 @@ or volunteer-computing backends.
 [`physics-conformance`](physics-conformance) is a non-publishable workspace
 crate. It exercises convention and interoperability boundaries across the
 independently versioned physics crates using only their public APIs.
+
+`berry-response` is also workspace-only while its numerical contracts are
+qualified. It consumes integrated dipoles; it does not generate electronic
+structure. See [Hamiltonian data](docs/hamiltonian-data.md) for public material
+inputs and [the Rustb qualification tool](tools/berry-response-rustb) for the
+separately pinned band-calculation backend.
+
+Run a synthetic dipole-to-voltage calibration with experiment metadata using
+`cargo run -p physics-conformance --example berry_response_run --locked`.
+Set `COMMUTATOR_SOURCE_REVISION` to the reviewed revision when recording a run;
+the example explicitly marks an omitted revision as unrecorded.
 
 The foundational crates deliberately do not contain HTTP, databases, identity,
 scheduling, or a particular scientific model. Those capabilities belong in

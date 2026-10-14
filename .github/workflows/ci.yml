@@ -32,11 +32,12 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - run: cargo test --workspace --doc --all-features --locked
+      - run: python3 -m unittest discover -s tools/hamiltonian-data -p 'test_*.py'
       - run: RUSTDOCFLAGS="-D warnings -D missing-docs" cargo doc --workspace --all-features --no-deps --locked
       - run: sha256sum --check clifford-core/tests/fixtures/clifford-golden-v1.sha256
       - run: sha256sum --check experiment-merkle/tests/fixtures/SHA256SUMS
       - name: Package every publishable crate together
-        run: cargo package --workspace --exclude physics-conformance --locked
+        run: cargo package --workspace --exclude physics-conformance --exclude berry-response --locked
 
   msrv:
     name: Rust 1.80
@@ -45,3 +46,23 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@1.80
       - run: cargo test --workspace --all-targets --all-features --locked
+
+  berry-backend:
+    name: Pinned Rustb reference comparison
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Install the CPU linear algebra backend
+        run: sudo apt-get update && sudo apt-get install -y libblas-dev liblapack-dev gfortran
+      - name: Provide the Netlib CBLAS linker name
+        shell: bash
+        run: |
+          mkdir -p target/netlib-link
+          ln -s "$(cc -print-file-name=libblas.so)" target/netlib-link/libcblas.so
+          echo "LIBRARY_PATH=$GITHUB_WORKSPACE/target/netlib-link" >> "$GITHUB_ENV"
+      - run: cargo fmt --check --manifest-path tools/berry-response-rustb/Cargo.toml
+      - run: cargo test --release --locked --manifest-path tools/berry-response-rustb/Cargo.toml
+      - run: cargo clippy --release --locked --all-targets --manifest-path tools/berry-response-rustb/Cargo.toml -- -D warnings

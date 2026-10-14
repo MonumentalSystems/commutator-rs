@@ -1,0 +1,16 @@
+[package]
+name = "berry-response-rustb"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+publish = false
+
+# Standalone qualification executable: do not increase the workspace MSRV.
+[workspace]
+
+[dependencies]
+berry-response = { path = "../../berry-response" }
+Rustb = { git = "https://github.com/LiuyichenYanwushang/Rustb", rev = "ba04a2a0746f9798433cb4d9826675d10177fbc7", default-features = false, features = ["netlib-system"] }
+ndarray = "0.17.2"
+num-complex = "0.4"
+serde_json = "1"

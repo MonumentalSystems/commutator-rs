@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "berry-response",
     "cluster-green",
     "cluster-embedding",
     "clifford-core",
@@ -29,6 +30,7 @@ members = [
     "quantum-tomography",
 ]
 default-members = [
+    "berry-response",
     "cluster-green",
     "cluster-embedding",
     "clifford-core",

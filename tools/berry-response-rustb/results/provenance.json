@@ -1,0 +1,25 @@
+{
+  "host": "being.local",
+  "date": "2026-10-14",
+  "rustc": "1.94.0 (4a4ef493e 2026-03-02)",
+  "target": "x86_64-unknown-linux-gnu",
+  "rustb_commit": "ba04a2a0746f9798433cb4d9826675d10177fbc7",
+  "backend": "netlib-system",
+  "RAYON_NUM_THREADS": 4,
+  "libraries_sha256": {
+    "/usr/lib/x86_64-linux-gnu/libblas.so.3": "e748efcae5753fe4a652877fccdb5895ac6f7605668a2db878b19c914e78e3a8",
+    "/usr/lib/x86_64-linux-gnu/liblapack.so.3": "851bb1fc5833ede9ed704b4417a251a899976d5e0915de40452615187a65278f",
+    "/usr/lib/x86_64-linux-gnu/libgfortran.so.5": "342618ccfebe840446e4ef2b7893f4161b2084845e570f42d68a70bfde58a58d"
+  },
+  "scope": "2D analytic two-band direct integration with zero eta; no material claims",
+  "source_sha256": {
+    "berry-response/src/lib.rs": "4d77ca132a38907542c77e96585fb10b91bb8f717eede1bb00d594b9b411ff92",
+    "berry-response/src/dipole.rs": "5641866e96881aa45020d0833eade1ed4282b438284e3319e5bd460c8b022393",
+    "berry-response/src/transport.rs": "1f87617a1473d40cf85ac647b93a75d453e32ca04e32221901d6695eb5b1a61a",
+    "tools/berry-response-rustb/src/main.rs": "4fb03808251f740fd61c232d821cc778934ff4091d991371492f8c7e6a2989bb",
+    "tools/berry-response-rustb/Cargo.toml": "6acbcdd4e47731f9a72cfbc398f560598c8555ba33cda86b040f6f77c3f07c78",
+    "tools/berry-response-rustb/Cargo.lock": "eda818ed91f1df5c76dc1b9012aad037599ccf9303c4597bab93132b2d93f784"
+  },
+  "results_sha256": "a1bc4ba4b73008c160c47caee702ba7e07f0e3d80a4d4cc0cd8ff6d70e03509b",
+  "replay": "Final reviewed source synchronized to isolated Linux directory; cargo test, clippy and run --release --locked passed; numerical JSON unchanged."
+}

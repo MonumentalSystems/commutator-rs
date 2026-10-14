@@ -1,0 +1,93 @@
+{
+  "backend": "netlib-system",
+  "controls": {
+    "chirality_reversal": -0.020209930890271083,
+    "lattice_2_3_angstrom": 0.04648284104762303,
+    "tilt_reversal": -0.02020993089027096,
+    "zero_tilt": -2.1959592355341025e-18
+  },
+  "convention": "A=i<u|grad u>; Omega_xy=-2Im; D_x=int_BZ f d_kx Omega_xy d²k/(2pi)²; lattice Angstrom; no e,hbar,tau factors in Rustb output",
+  "core_boundary": {
+    "Dx_metres": -2.020993089027108e-12,
+    "mapping": "core[a][b][c] = SI_prefactor * Rustb[a][c][b] * 1e-10; both full contractions identical after symmetrization",
+    "omega_rad_per_second": 1000000000000.0,
+    "peak_fields_V_per_m": [
+      [
+        100.0,
+        20.0
+      ],
+      [
+        30.0,
+        -10.0
+      ]
+    ],
+    "peak_sheet_current_A_per_m": [
+      [
+        -1.1691746774715134e-10,
+        2.6639423030996507e-11
+      ],
+      [
+        3.6999198654161814e-10,
+        1.1247756390865192e-10
+      ]
+    ],
+    "tau_seconds": 1e-13
+  },
+  "eta_eV": 0.0,
+  "field_permutations": {
+    "ordered_xxy": -1.7700811936514063e-20,
+    "ordered_xyx": -0.02020993089027108,
+    "symmetric_xxy": -0.01010496544513554,
+    "symmetric_xyx": -0.01010496544513554
+  },
+  "limitations": [
+    "finite-temperature direct quadrature only; zero-temperature energy-cut unqualified",
+    "positive orthogonal lattices only",
+    "no material-specific, scattering, spin-current or full position-matrix qualification"
+  ],
+  "mesh_checks": [
+    {
+      "analytic_Dx_FS_angstrom": -0.019686927840707677,
+      "analytic_Dx_sea_angstrom": -0.02019778563723705,
+      "mesh": [
+        64,
+        64
+      ],
+      "rustb_ordered_yxx_angstrom": 0.019686927840707677
+    },
+    {
+      "analytic_Dx_FS_angstrom": -0.02020993089027103,
+      "analytic_Dx_sea_angstrom": -0.020207259409952515,
+      "mesh": [
+        128,
+        128
+      ],
+      "rustb_ordered_yxx_angstrom": 0.02020993089027108
+    },
+    {
+      "analytic_Dx_FS_angstrom": -0.02020704558439784,
+      "analytic_Dx_sea_angstrom": -0.020207046640703115,
+      "mesh": [
+        256,
+        256
+      ],
+      "rustb_ordered_yxx_angstrom": 0.020207045584397856
+    },
+    {
+      "analytic_Dx_FS_angstrom": -0.020207046634234414,
+      "analytic_Dx_sea_angstrom": -0.020207046634235164,
+      "mesh": [
+        512,
+        512
+      ],
+      "rustb_ordered_yxx_angstrom": 0.02020704663423444
+    }
+  ],
+  "model": "periodic tilted two-band QWZ; mathematical fixture, not a fitted material Hamiltonian; generally breaks time reversal",
+  "mu_eV": 1.5,
+  "passed": true,
+  "pointwise_Berry_max_abs_error": 4.440892098500626e-16,
+  "rustb_git_rev": "ba04a2a0746f9798433cb4d9826675d10177fbc7",
+  "schema": "berry-response-rustb-qualification-v1",
+  "temperature_K": 300.0
+}

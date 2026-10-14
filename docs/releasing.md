@@ -25,13 +25,14 @@ RUSTDOCFLAGS="-D warnings -D missing-docs" \
   cargo doc --workspace --all-features --no-deps --locked
 sha256sum --check clifford-core/tests/fixtures/clifford-golden-v1.sha256
 sha256sum --check experiment-merkle/tests/fixtures/SHA256SUMS
-cargo package --workspace --exclude physics-conformance --locked
+cargo package --workspace --exclude physics-conformance --exclude berry-response --locked
 ```
 
 The single multi-package `cargo package` invocation is intentional. Cargo can
 resolve every selected path dependency from the same workspace revision while
-verifying the generated archives. `physics-conformance` is excluded because it
-is a workspace integration-test consumer with `publish = false`.
+verifying the generated archives. `physics-conformance` and `berry-response`
+are excluded because they are workspace-only validation/reference consumers
+with `publish = false`.
 
 Before uploading, inspect every generated archive with `cargo package --list
 -p <crate>`. The package must contain its README, license, tests, and all source

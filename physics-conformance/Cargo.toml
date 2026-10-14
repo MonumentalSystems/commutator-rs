@@ -8,6 +8,10 @@ license.workspace = true
 description = "Cross-crate convention and interoperability tests"
 
 [dependencies]
+berry-response = { path = "../berry-response" }
+clifford-core = { path = "../clifford-core" }
+experiment-core = { path = "../experiment-core" }
+serde_json = { version = "1.0", features = ["float_roundtrip"] }
 cluster-embedding = { path = "../cluster-embedding" }
 keldysh-green = { path = "../keldysh-green" }
 open-quantum-systems = { path = "../open-quantum-systems" }
