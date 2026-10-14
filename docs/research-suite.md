@@ -46,6 +46,18 @@ that they are already available from crates.io.
 
 ## Green functions and correlated matter
 
+- `berry-response` supplies a workspace-only, backend-neutral reference for
+  already integrated 2D and 3D Berry-curvature dipoles. It makes SI units,
+  Berry connection sign, ordered versus symmetrized input fields, static versus
+  second-harmonic amplitudes, and voltage-lead orientation explicit. Checked
+  real symmetric positive-definite transport tensors map the source Hall
+  current to an open-circuit voltage. The linear transport is an Ohmic
+  quasistatic model; it does not include frequency-dependent conductivity or
+  extrinsic scattering mechanisms. The independently pinned Rustb tool lives
+  outside the default workspace and is qualified against analytic fixtures.
+  Material band generation remains upstream; see
+  [Hamiltonian data](hamiltonian-data.md) for available inputs and their limits.
+
 - `cluster-green` starts from a cluster one-particle Green function. It checks
   retarded causality and performs CPT/Dyson embedding and position-aware
   periodization; it does not duplicate an exact-diagonalization solver.

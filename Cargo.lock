@@ -9,6 +9,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
+name = "berry-response"
+version = "0.1.0"
+dependencies = [
+ "num-complex",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -291,12 +298,16 @@ dependencies = [
 name = "physics-conformance"
 version = "0.1.0"
 dependencies = [
+ "berry-response",
+ "clifford-core",
  "cluster-embedding",
+ "experiment-core",
  "keldysh-green",
  "open-quantum-systems",
  "quantum-shadows",
  "quantum-tomography",
  "quantum-transport",
+ "serde_json",
  "superconducting-dynamics",
  "superconductivity",
 ]

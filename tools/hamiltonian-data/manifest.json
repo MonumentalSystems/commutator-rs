@@ -1,0 +1,95 @@
+{
+  "retrieved_utc_date": "2026-10-14",
+  "files": [
+    {
+      "dataset": "te",
+      "path": "te/Te_tb.dat",
+      "url": "https://raw.githubusercontent.com/wannier-berri/WannierBerri-tutorial/efe56e5b312a903bdbf06dcfc7b5fb8bb44c2afb/tutorials/5_symmetrization/Te_data/Te_tb.dat",
+      "bytes": 17305196,
+      "sha256": "5a9f95f14535dfa894901c8ae2ca86897b5a9e3ad6787ef46cc4b12282c3bacf",
+      "license": "No repository license detected; do not redistribute without clarification",
+      "source_commit": "efe56e5b312a903bdbf06dcfc7b5fb8bb44c2afb"
+    },
+    {
+      "dataset": "te",
+      "path": "te/Te.win",
+      "url": "https://raw.githubusercontent.com/wannier-berri/WannierBerri-tutorial/efe56e5b312a903bdbf06dcfc7b5fb8bb44c2afb/tutorials/5_symmetrization/Te_data/Te.win",
+      "bytes": 10246,
+      "sha256": "3fbd3e977716476c0a71a537f31c905b1e1c595c517dc48eec13fcaa0789b5f5",
+      "license": "No repository license detected; do not redistribute without clarification",
+      "source_commit": "efe56e5b312a903bdbf06dcfc7b5fb8bb44c2afb"
+    },
+    {
+      "dataset": "te",
+      "path": "te/POSCAR",
+      "url": "https://raw.githubusercontent.com/wannier-berri/WannierBerri-tutorial/efe56e5b312a903bdbf06dcfc7b5fb8bb44c2afb/tutorials/5_symmetrization/Te_data/POSCAR",
+      "bytes": 650,
+      "sha256": "7ff0d85a1f3e7ace9215449e3c723f4921c21111533017c857100a0bec0bc298",
+      "license": "No repository license detected; do not redistribute without clarification",
+      "source_commit": "efe56e5b312a903bdbf06dcfc7b5fb8bb44c2afb"
+    },
+    {
+      "dataset": "te",
+      "path": "te/INCAR",
+      "url": "https://raw.githubusercontent.com/wannier-berri/WannierBerri-tutorial/efe56e5b312a903bdbf06dcfc7b5fb8bb44c2afb/tutorials/5_symmetrization/Te_data/INCAR",
+      "bytes": 518,
+      "sha256": "6f2522a3b4f601fe3c057e18dec2015320427d4607a7a26e202b56dc3d492101",
+      "license": "No repository license detected; do not redistribute without clarification",
+      "source_commit": "efe56e5b312a903bdbf06dcfc7b5fb8bb44c2afb"
+    },
+    {
+      "dataset": "te",
+      "path": "te/KPOINTS",
+      "url": "https://raw.githubusercontent.com/wannier-berri/WannierBerri-tutorial/efe56e5b312a903bdbf06dcfc7b5fb8bb44c2afb/tutorials/5_symmetrization/Te_data/KPOINTS",
+      "bytes": 36,
+      "sha256": "708b38b5ce51f266135a6c761943414a985784a923de02848f7408432a09ebc4",
+      "license": "No repository license detected; do not redistribute without clarification",
+      "source_commit": "efe56e5b312a903bdbf06dcfc7b5fb8bb44c2afb"
+    },
+    {
+      "dataset": "wte2",
+      "path": "wte2/WTe2_ZT_SOC_hr.tar.gz",
+      "url": "https://raw.githubusercontent.com/quanshengwu/wannier_tools/362171ce35450118828c6960a882e3a6d08c73f5/examples/WTe2/WTe2_ZT_SOC_hr.tar.gz",
+      "bytes": 19106014,
+      "sha256": "48b20e62ece962bb842aa0163dbaaba0958c0ffb731e2194b99e602a000a942e",
+      "license": "Repository GPL-3.0; check data-specific terms before redistribution",
+      "source_commit": "362171ce35450118828c6960a882e3a6d08c73f5"
+    },
+    {
+      "dataset": "wte2",
+      "path": "wte2/wannier90.win",
+      "url": "https://raw.githubusercontent.com/quanshengwu/wannier_tools/362171ce35450118828c6960a882e3a6d08c73f5/examples/WTe2/wannier90.win",
+      "bytes": 13415,
+      "sha256": "b6791c186db88359502a2cdca516f3e1f9da8975c92bde4e854be864fd71d46d",
+      "license": "Repository GPL-3.0; check data-specific terms before redistribution",
+      "source_commit": "362171ce35450118828c6960a882e3a6d08c73f5"
+    },
+    {
+      "dataset": "wte2",
+      "path": "wte2/wannier90.wout",
+      "url": "https://raw.githubusercontent.com/quanshengwu/wannier_tools/362171ce35450118828c6960a882e3a6d08c73f5/examples/WTe2/wannier90.wout",
+      "bytes": 963311,
+      "sha256": "c6245668605d26e30fd2f557adf1e98ff59dbaee32ff498b0f4432788228daa4",
+      "license": "Repository GPL-3.0; check data-specific terms before redistribution",
+      "source_commit": "362171ce35450118828c6960a882e3a6d08c73f5"
+    },
+    {
+      "dataset": "wte2",
+      "path": "wte2/POSCAR",
+      "url": "https://raw.githubusercontent.com/quanshengwu/wannier_tools/362171ce35450118828c6960a882e3a6d08c73f5/examples/WTe2/POSCAR",
+      "bytes": 619,
+      "sha256": "7da3fcf5d3dee1ec9ff9df02a672a56bbc8fea921c7c3f756dbf27d6bb5cde17",
+      "license": "Repository GPL-3.0; check data-specific terms before redistribution",
+      "source_commit": "362171ce35450118828c6960a882e3a6d08c73f5"
+    },
+    {
+      "dataset": "wte2",
+      "path": "wte2/wt.in",
+      "url": "https://raw.githubusercontent.com/quanshengwu/wannier_tools/362171ce35450118828c6960a882e3a6d08c73f5/examples/WTe2/wt.in",
+      "bytes": 7115,
+      "sha256": "2bfe3cfae6d3df545ad98bdac6c9baa98344b1b049780caeb18a939ef7922ef2",
+      "license": "Repository GPL-3.0; check data-specific terms before redistribution",
+      "source_commit": "362171ce35450118828c6960a882e3a6d08c73f5"
+    }
+  ]
+}

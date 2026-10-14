@@ -1,0 +1,9 @@
+[workspace]
+members = ["berry-response"]
+resolver = "2"
+[workspace.package]
+edition = "2021"
+rust-version = "1.80"
+license = "MIT"
+repository = "https://github.com/MonumentalSystems/commutator-rs"
+homepage = "https://commutator.science"

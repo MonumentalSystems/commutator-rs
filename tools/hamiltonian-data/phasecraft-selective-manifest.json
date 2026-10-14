@@ -1,0 +1,311 @@
+{
+  "doi": "10.5281/zenodo.8370650",
+  "license": "CC-BY-4.0",
+  "url": "https://zenodo.org/records/8370650/files/towards_quantum_simulation.zip?download=1",
+  "archive_bytes": 92023575,
+  "advertised_archive_md5": "33cf4fb7b6d435814112fa75ee9b19a1",
+  "whole_archive_md5_verified": false,
+  "files": [
+    {
+      "path": "Li2CuO2/map_indices_to_mode.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/Li2CuO2/hamiltonian/map_indices_to_mode.json",
+      "bytes": 10342,
+      "sha256": "04a5265c016a3465e2f926bbe140884238c1c5fb8e63eabd35bcf5b92fb0233d",
+      "zip_crc32": "8edca2c6",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "Li2CuO2/interactions.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/Li2CuO2/hamiltonian/interactions.json",
+      "bytes": 25133,
+      "sha256": "4a450a0b5077d47e358f7a9cef047315fa313581933a1123583556ebb487e96b",
+      "zip_crc32": "db1aed81",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "Li2CuO2/map_group_to_position.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/Li2CuO2/hamiltonian/map_group_to_position.json",
+      "bytes": 427,
+      "sha256": "763823f8e6f477c4af5388d9901b11c571c78fca7523f3a7feddc7e3c36109bd",
+      "zip_crc32": "8f8cda33",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "Li2CuO2/stage_data.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/Li2CuO2/hamiltonian/stage_data.json",
+      "bytes": 1178,
+      "sha256": "b61d13708bb290438cfd801fb845adc986cd90cf7ec55e25c22f835584fbe2af",
+      "zip_crc32": "61a4c42a",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "Li2CuO2/map_majorana_to_mode.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/Li2CuO2/hamiltonian/map_majorana_to_mode.json",
+      "bytes": 13850,
+      "sha256": "7494b754030cb6f4164b9a8e86764661a6cc19513138e98f97a7791afd3e0eb2",
+      "zip_crc32": "957239a5",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "Li2CuO2/map_mode_to_group.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/Li2CuO2/hamiltonian/map_mode_to_group.json",
+      "bytes": 6248,
+      "sha256": "eeec262ba0142bcb3b8213a0c42d1402142d3a07eb03994a24882a38e7051e68",
+      "zip_crc32": "3f382bd6",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "H3S/map_indices_to_mode.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/H3S/hamiltonian/map_indices_to_mode.json",
+      "bytes": 18860,
+      "sha256": "3c9577cf04e7cfd77cd67a9c9e7c369d5726046a729491c0b00d53412e0f92e1",
+      "zip_crc32": "7de40467",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "H3S/interactions.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/H3S/hamiltonian/interactions.json",
+      "bytes": 65710,
+      "sha256": "32157483bdffd5272fb6929de1bdde39b8a6972de00cd33d9f23958bcfca1865",
+      "zip_crc32": "447b3f16",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "H3S/map_group_to_position.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/H3S/hamiltonian/map_group_to_position.json",
+      "bytes": 1225,
+      "sha256": "904fd9dd516e668814c121995598f0a747f1ff42b09a3d67c82e6434e7170c46",
+      "zip_crc32": "1bf5519d",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "H3S/stage_data.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/H3S/hamiltonian/stage_data.json",
+      "bytes": 1184,
+      "sha256": "e3acf2ab398b5614607b1a73ce56ef75e3601771298f522c66a6d2bb55e8d68f",
+      "zip_crc32": "69473b08",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "H3S/map_majorana_to_mode.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/H3S/hamiltonian/map_majorana_to_mode.json",
+      "bytes": 25970,
+      "sha256": "d0780fe8ac4c70e24d31ddfd3c2ab189673cf43f04b5c8139eb21f98de826fbf",
+      "zip_crc32": "e91560cc",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "H3S/map_mode_to_group.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/H3S/hamiltonian/map_mode_to_group.json",
+      "bytes": 11580,
+      "sha256": "2c3e2088757b8d3fb817a73c54e931da94ba2a0aa8ebb9e19ff67aba6fc1dd55",
+      "zip_crc32": "1f2069f5",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "SrVO3/map_indices_to_mode.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/SrVO3/hamiltonian/map_indices_to_mode.json",
+      "bytes": 2224,
+      "sha256": "8f49a4fc7aa088562659cb5fbfe2daabcbc8660dc88b0bf8d2e08daa9b679114",
+      "zip_crc32": "f4fd7920",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "SrVO3/interactions.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/SrVO3/hamiltonian/interactions.json",
+      "bytes": 15796,
+      "sha256": "e2a6d53c054a9152ef55bdaee6d104058e13a61dff4abb5ab27cf0b00dd47fe5",
+      "zip_crc32": "7ba5cb32",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "SrVO3/map_group_to_position.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/SrVO3/hamiltonian/map_group_to_position.json",
+      "bytes": 351,
+      "sha256": "7edd4832efe7580921c133337ef59ec840370dd494f51859872144464bdd72fd",
+      "zip_crc32": "9e03c749",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "SrVO3/stage_data.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/SrVO3/hamiltonian/stage_data.json",
+      "bytes": 1175,
+      "sha256": "389607d7dffd855deedba2c7ecf8b7fdb4367056ca36905c014909418b6a5454",
+      "zip_crc32": "912ca8a0",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "SrVO3/map_majorana_to_mode.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/SrVO3/hamiltonian/map_majorana_to_mode.json",
+      "bytes": 2862,
+      "sha256": "2b08d98b68e6129fbb55199e202c0a97f96f32ba6d8d52faa0c06573d24e1c27",
+      "zip_crc32": "15c418dd",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "SrVO3/map_mode_to_group.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/SrVO3/hamiltonian/map_mode_to_group.json",
+      "bytes": 1312,
+      "sha256": "7c1248d8ee43736ba07e0ba03d70038075e70b50c52eadb76369b4c0991d788c",
+      "zip_crc32": "0aa67d0c",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "GaAs/map_indices_to_mode.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/GaAs/hamiltonian/map_indices_to_mode.json",
+      "bytes": 9050,
+      "sha256": "19bd04d2b23290a7e220d112c2109a3bb8f5b0cc453519ee285381d9607a6883",
+      "zip_crc32": "0dd12a41",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "GaAs/interactions.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/GaAs/hamiltonian/interactions.json",
+      "bytes": 43000,
+      "sha256": "24cf75f94e9574f377bd0db2511c1831b98e6e9375b2cb79db2172176b88b68c",
+      "zip_crc32": "5abc6735",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "GaAs/map_group_to_position.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/GaAs/hamiltonian/map_group_to_position.json",
+      "bytes": 1035,
+      "sha256": "bb052dadc8c260e918f08e057136e27672e9f10d53572c1291b96a930f42233c",
+      "zip_crc32": "d62976d6",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "GaAs/stage_data.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/GaAs/hamiltonian/stage_data.json",
+      "bytes": 1176,
+      "sha256": "0c3601c324341c0c69c04e499aec665c4d075c2aa0a35117cd9e5bea798aa1e7",
+      "zip_crc32": "b6483d16",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "GaAs/map_majorana_to_mode.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/GaAs/hamiltonian/map_majorana_to_mode.json",
+      "bytes": 11990,
+      "sha256": "855ba4d3877d0e9da6532c7b5bc1c0e0caa116342602663f7c73fdcbce692833",
+      "zip_crc32": "7f43cccf",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "GaAs/map_mode_to_group.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/GaAs/hamiltonian/map_mode_to_group.json",
+      "bytes": 5530,
+      "sha256": "07038e84f922f15fd77543fdf0ac1e51e56f4f05b4a3480445a4b4016993323d",
+      "zip_crc32": "533d893b",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "Si/map_indices_to_mode.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/Si/hamiltonian/map_indices_to_mode.json",
+      "bytes": 9050,
+      "sha256": "19bd04d2b23290a7e220d112c2109a3bb8f5b0cc453519ee285381d9607a6883",
+      "zip_crc32": "0dd12a41",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "Si/interactions.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/Si/hamiltonian/interactions.json",
+      "bytes": 43588,
+      "sha256": "a314047d4befac27ffb60ae2c5f7fbf2def107c4097d593a907504e1562b1ac1",
+      "zip_crc32": "d6c2487f",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "Si/map_group_to_position.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/Si/hamiltonian/map_group_to_position.json",
+      "bytes": 1035,
+      "sha256": "bb052dadc8c260e918f08e057136e27672e9f10d53572c1291b96a930f42233c",
+      "zip_crc32": "d62976d6",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "Si/stage_data.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/Si/hamiltonian/stage_data.json",
+      "bytes": 1172,
+      "sha256": "01d4596691227fcf6df3c003e790e068d19ac85580df85b258c6bd49f1ee48b2",
+      "zip_crc32": "46d62272",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "Si/map_majorana_to_mode.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/Si/hamiltonian/map_majorana_to_mode.json",
+      "bytes": 11990,
+      "sha256": "855ba4d3877d0e9da6532c7b5bc1c0e0caa116342602663f7c73fdcbce692833",
+      "zip_crc32": "7f43cccf",
+      "zip_crc32_verified": true
+    },
+    {
+      "path": "Si/map_mode_to_group.json",
+      "zip_member": "datashare/towards_quantum_simulation_data/Si/hamiltonian/map_mode_to_group.json",
+      "bytes": 5530,
+      "sha256": "07038e84f922f15fd77543fdf0ac1e51e56f4f05b4a3480445a4b4016993323d",
+      "zip_crc32": "533d893b",
+      "zip_crc32_verified": true
+    }
+  ],
+  "readme": {
+    "zip_member": "datashare/README.md",
+    "bytes": 4323,
+    "sha256": "805bf66431cd6cdc062233440c67074a75f37e7e732c3b9ef816d1703d2c9056",
+    "zip_crc32": "29ae6b02",
+    "zip_crc32_verified": true,
+    "acquisition": "CRC-checked zipfile read through HTTP RangeReader; byte-range provenance included below"
+  },
+  "ranges": [
+    {
+      "start": 92012544,
+      "end": 92023574,
+      "sha256": "5f95a7e50575daa90a6b73bcc0b9af3a907d56a0c336f9e5ccdeb125c4ad4280"
+    },
+    {
+      "start": 91947008,
+      "end": 92012543,
+      "sha256": "1ad51938c4021b5c10914394cd8c248fc91a6f99d0abc3a076abe9142ee56fee"
+    },
+    {
+      "start": 196608,
+      "end": 262143,
+      "sha256": "9cb1c70d3d91b8eeff8edc581dc40d32cd4a0bfb48f177832a55d9e28341f34a"
+    },
+    {
+      "start": 786432,
+      "end": 851967,
+      "sha256": "121bae96953e92a8d1d376472c7bc303d918e26efe2179feb1af69ddd6c82805"
+    },
+    {
+      "start": 851968,
+      "end": 917503,
+      "sha256": "7e5c31a62765a3ef4c97832f52aeccb0e315fde76d2a4630c256bc3f9e7e8f87"
+    },
+    {
+      "start": 3276800,
+      "end": 3342335,
+      "sha256": "1f71f9c28844b22f21b05f45de891c732b0f81ea850b473a0503aab05e7783b0"
+    },
+    {
+      "start": 3342336,
+      "end": 3407871,
+      "sha256": "b5faf7b0e10f0776941387e49aec4d24d877691a685b2da4b8d299c34e8e4569"
+    },
+    {
+      "start": 3538944,
+      "end": 3604479,
+      "sha256": "d44797faf5a04b186623ac457645042e7121cafa7ee092ae42d904e1949e7808"
+    },
+    {
+      "start": 5111808,
+      "end": 5177343,
+      "sha256": "c181820d785a02ff8f2b00842fefb8d9ea127e4b7c32f09063714d2618e2434a"
+    },
+    {
+      "start": 6619136,
+      "end": 6684671,
+      "sha256": "e6898336d5376e3c3a6d5a92b8f8dcf946d2340d502ec97bdfc4f77a24408cad"
+    }
+  ],
+  "downloaded_range_bytes": 600855
+}
